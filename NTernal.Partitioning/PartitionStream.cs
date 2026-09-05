@@ -1,23 +1,17 @@
 ﻿using Nternal.Core.Streams;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Nternal.Partitioning.Mbr
+namespace Nternal.Partitioning
 {
-    public class MbrPartitionStream : IDataStream
+    public class PartitionStream : IDataStream
     {
-        public long Length => Entry.SizeInSectors * Alignment;
+        public long Length => (long)(Entry.EndingLba - Entry.StartingLba) * Alignment;
         public int Alignment => Underlying.Alignment;
 
         private IDataStream Underlying { get; }
-        private MbrPartitionEntry Entry { get; }
+        private IPartitionEntry Entry { get; }
 
-        public MbrPartitionStream(IDataStream underlying, MbrPartitionEntry partition)
+        public PartitionStream(IDataStream underlying, IPartitionEntry partition)
         {
-            if (partition.PartitionType == MbrPartitionType.Empty)
-                throw new ArgumentException("Cannot create a stream for an empty partition.", nameof(partition));
-
             Underlying = underlying;
             Entry = partition;
         }
@@ -39,7 +33,7 @@ namespace Nternal.Partitioning.Mbr
                 return 0;
 
             int length = (int)Math.Min(buffer.Length, Length - position);
-            long absolutePosition = Entry.StartingLba * Alignment + position;
+            long absolutePosition = (long)Entry.StartingLba * Alignment + position;
             return Underlying.Read(absolutePosition, buffer.Slice(0, length));
         }
 
@@ -54,7 +48,7 @@ namespace Nternal.Partitioning.Mbr
         {
             if (Underlying.TryGetMemory(out var underlying))
             {
-                memory = underlying.Slice((int)(Entry.StartingLba * Alignment), (int)Length);
+                memory = underlying.Slice((int)((long)Entry.StartingLba * Alignment), (int)Length);
                 return true;
             }
 

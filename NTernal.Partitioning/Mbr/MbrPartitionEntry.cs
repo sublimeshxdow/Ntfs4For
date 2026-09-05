@@ -15,7 +15,7 @@ namespace Nternal.Partitioning.Mbr
         Invalid
     }
 
-    public struct MbrPartitionEntry
+    public readonly struct MbrPartitionEntry : IPartitionEntry
     {
         public MbrPartitionEntry(ReadOnlySpan<byte> data, IDataStream? stream = null)
         {
@@ -37,26 +37,30 @@ namespace Nternal.Partitioning.Mbr
             SizeInSectors = data.ReadUInt32(12);
         }
 
-        public MbrPartitionStream CreateDataStream()
+        public PartitionStream CreatePartitionStream()
         {
             if (Underlying == null)
                 throw new InvalidOperationException($"The MasterBootRecord used to create this MbrPartitionEntry was created without a valid disk stream!");
-
-            return new MbrPartitionStream(Underlying, this);
+            
+            return PartitionType == MbrPartitionType.Empty ? throw new InvalidOperationException($"Cannot create a partition stream for an unused partition!")
+                : new PartitionStream(Underlying, this);
         }
 
-        public MbrPartitionStream CreateDataStream(IDataStream underlying)
+        public PartitionStream CreateDataStream(IDataStream underlying)
         {
-            return new MbrPartitionStream(underlying, this);
+            return new PartitionStream(underlying, this);
         }
 
         private IDataStream? Underlying { get; }
 
-        public BootState Bootable { get; set; }
-        public MbrPartitionType PartitionType { get; set; }
-        public ChsAddress ChsStart { get; set; }
-        public ChsAddress ChsEnd { get; set; }
-        public uint StartingLba { get; set; }
-        public uint SizeInSectors { get; set; }
+        public BootState Bootable { get; }
+        public MbrPartitionType PartitionType { get; }
+        public ChsAddress ChsStart { get; }
+        public ChsAddress ChsEnd { get; }
+        public uint StartingLba { get; }
+        public uint SizeInSectors { get; }
+
+        ulong IPartitionEntry.StartingLba => StartingLba;
+        ulong IPartitionEntry.EndingLba => StartingLba + SizeInSectors;
     }
 }

@@ -61,8 +61,8 @@ namespace Nternal.Partitioning.Gpt
                 uint computedCrc = Crc32.HashToUInt32(partitionBytes[0..realArrayBytes]);
 
                 if (computedCrc != Header.PartitionArrayCrc32)
-                    throw new InvalidDataException($"The calculated checksum of the partition array ({computedCrc.ToString("X8")})"
-                        + $" does not match the one present in the header ({Header.PartitionArrayCrc32.ToString("X8")})!");
+                    throw new InvalidDataException($"The calculated checksum of the partition array ({computedCrc:X8})"
+                        + $" does not match the one present in the header ({Header.PartitionArrayCrc32:X8})!");
             }
 
             List<GptPartitionEntry> entries = new((int)Header.NumberOfPartitionEntries);

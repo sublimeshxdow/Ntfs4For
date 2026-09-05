@@ -2,15 +2,17 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Nternal.Core.Streams;
 
 namespace Nternal.Partitioning.Gpt
 {
-    public struct GptPartitionEntry
+    public readonly struct GptPartitionEntry : IPartitionEntry
     {
         public GptPartitionEntry(ReadOnlySpan<byte> buffer, bool paranoid)
         {
             if (buffer.Length < MinimumEntrySize)
-                throw new InvalidDataException($"The minimum GPT partition entry size is {MinimumEntrySize}, but only got {buffer.Length} bytes!");
+                throw new InvalidDataException(
+                    $"The minimum GPT partition entry size is {MinimumEntrySize}, but only got {buffer.Length} bytes!");
 
             TypeGuid = new Guid(buffer[0..16]);
             PartitionGuid = new Guid(buffer[16..32]);
@@ -18,6 +20,13 @@ namespace Nternal.Partitioning.Gpt
             EndingLba = buffer.ReadUInt64(40);
             Flags = (GptPartitionFlags)buffer.ReadUInt64(48);
             Name = buffer.ReadUnicodeString(56, 72, paranoid);
+        }
+        
+        public PartitionStream CreatePartitionStream(IDataStream underlying)
+        {
+            ArgumentNullException.ThrowIfNull(underlying);
+            return IsUnused ? throw new InvalidOperationException($"Cannot create a partition stream for an unused partition!")
+                : new PartitionStream(underlying, this);
         }
 
         public const uint MinimumEntrySize = 128;

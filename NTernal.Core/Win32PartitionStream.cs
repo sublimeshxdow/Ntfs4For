@@ -1,10 +1,7 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using Nternal.Core.Streams;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Nternal.Streams
+namespace Nternal.Core
 {
     public sealed class Win32PartitionStream : IDataStream
     {
