@@ -1,10 +1,29 @@
-﻿using Nternal.Extensions;
+﻿using Nternal.Core.Streams;
+using Nternal.Extensions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Nternal.Partitioning.Mbr
 {
     public class MasterBootRecord
     {
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+        public MasterBootRecord(IDataStream drive, bool paranoid = true)
+        {
+            Underlying = drive;
+
+            Span<byte> buffer = stackalloc byte[MbrSize];
+            drive.ReadExactly(0, buffer);
+
+            Parse(buffer, paranoid);
+        }
+
         public MasterBootRecord(ReadOnlySpan<byte> data, bool paranoid = true)
+        {
+            Parse(data, paranoid);
+        }
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+
+        public void Parse(ReadOnlySpan<byte> data, bool paranoid = true)
         {
             if (data.Length != 512)
                 throw new ArgumentException("MBR must be exactly 512 bytes long.", nameof(data));
@@ -15,7 +34,7 @@ namespace Nternal.Partitioning.Mbr
             for (int i = 0; i < NumberOfBootEntries; i++)
             {
                 var entryData = data.Slice(446 + i * 16, 16);
-                PartitionEntries[i] = new MbrPartitionEntry(entryData);
+                PartitionEntries[i] = new MbrPartitionEntry(entryData, Underlying);
             }
 
             BootSignature = data.ReadUInt16(510);
@@ -23,17 +42,20 @@ namespace Nternal.Partitioning.Mbr
                 throw new InvalidDataException($"Invalid boot signature: {BootSignature:X4}. Expected: {ExpectedBootSignature:X4}.");
         }
 
+        private IDataStream? Underlying { get; }
+
+        public const int MbrSize = 512;
         public const ushort ExpectedBootSignature = 0xAA55;
         public const byte NumberOfBootEntries = 4;
 
-        public byte[] BootstrapCode { get; }
-        public uint DiskSignature { get; }
+        public byte[] BootstrapCode { get; private set; }
+        public uint DiskSignature { get; private set; }
 
         public MbrPartitionEntry[] PartitionEntries { get; } = new MbrPartitionEntry[NumberOfBootEntries];
 
         public bool IsGptProtective => PartitionEntries.Any(p => p.PartitionType == MbrPartitionType.GptProtective);
         public bool IsValid => BootSignature == ExpectedBootSignature;
 
-        public ushort BootSignature { get; }
+        public ushort BootSignature { get; private set; }
     }
 }

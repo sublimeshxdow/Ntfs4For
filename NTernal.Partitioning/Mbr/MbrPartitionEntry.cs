@@ -3,6 +3,7 @@ using Nternal.Extensions;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace Nternal.Partitioning.Mbr
@@ -16,8 +17,9 @@ namespace Nternal.Partitioning.Mbr
 
     public struct MbrPartitionEntry
     {
-        public MbrPartitionEntry(ReadOnlySpan<byte> data)
+        public MbrPartitionEntry(ReadOnlySpan<byte> data, IDataStream? stream = null)
         {
+            Underlying = stream;
             if (data.Length != 16)
                 throw new ArgumentException("Partition entry must be exactly 16 bytes long.", nameof(data));
 
@@ -35,10 +37,20 @@ namespace Nternal.Partitioning.Mbr
             SizeInSectors = data.ReadUInt32(12);
         }
 
+        public MbrPartitionStream CreateDataStream()
+        {
+            if (Underlying == null)
+                throw new InvalidOperationException($"The MasterBootRecord used to create this MbrPartitionEntry was created without a valid disk stream!");
+
+            return new MbrPartitionStream(Underlying, this);
+        }
+
         public MbrPartitionStream CreateDataStream(IDataStream underlying)
         {
             return new MbrPartitionStream(underlying, this);
         }
+
+        private IDataStream? Underlying { get; }
 
         public BootState Bootable { get; set; }
         public MbrPartitionType PartitionType { get; set; }
