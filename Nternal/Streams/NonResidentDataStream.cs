@@ -8,28 +8,21 @@ namespace Nternal.Streams
 {
     public class DataRun
     {
-        public long StartingCluster { get; set; }
+        public long? StartingCluster { get; set; }
         public long Length { get; set; }
         public bool Sparse { get; set; }
-
-        public DataRun(long startingCluster, long length, bool sparse)
-        {
-            StartingCluster = startingCluster;
-            Length = length;
-            Sparse = sparse;
-        }
     }
 
     public class Extent
     {
         public long LowestVcn { get; set; }
         public long HighestVcn { get; set; }
-        public List<DataRun> DataRuns { get; private set; } = [];
+        public List<DataRun> DataRuns { get; set; } = [];
 
         public ushort CompressionUnitSize { get; set; }
-        public long AllocatedSize { get; set; }
-        public long RealSize { get; set; }
-        public long InitializedSize { get; set; }
+        public long? AllocatedSize { get; set; }
+        public long? RealSize { get; set; }
+        public long? InitializedSize { get; set; }
     }
 
     public class NonResidentDataStream : IDataStream

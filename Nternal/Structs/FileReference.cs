@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Nternal.Structs
 {
-    public readonly struct FileReference
+    public readonly record struct FileReference
     {
         private const ulong FileRecordIdMask = 0x0000FFFFFFFFFFFF;
 

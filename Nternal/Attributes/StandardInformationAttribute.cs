@@ -6,7 +6,7 @@ namespace Nternal.Attributes
 {
     public class StandardInformationAttribute : NtfsAttribute
     {
-        public override void ParseFromAccessor()
+        public override void ParseFromAccessor(bool paranoid)
         {
             Span<byte> data = new byte[Accessor.Length];
             Accessor.ReadExactly(0, data);

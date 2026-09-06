@@ -73,7 +73,7 @@ namespace Nternal.Attributes
         public List<KeyEntry> DDFKeys { get; set; }
         public List<KeyEntry> DRFKeys { get; set; }
 
-        public override void ParseFromAccessor()
+        public override void ParseFromAccessor(bool paranoid)
         {
             Span<byte> buffer = new byte[Accessor.Length];
             Accessor.ReadExactly(0, buffer);

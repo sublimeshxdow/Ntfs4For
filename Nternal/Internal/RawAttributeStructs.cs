@@ -37,14 +37,14 @@ namespace Nternal.Internal
     {
         public RawAttributeHeader Common; // 0x00
 
-        public ulong StartingVcn;      // 0x10
-        public ulong LastVcn;          // 0x18
+        public long StartingVcn;      // 0x10
+        public long LastVcn;          // 0x18
         public ushort DataRunsOffset;  // 0x20
         public ushort CompressionUnitSize; // 0x22
         public uint Padding;           // 0x24
-        public ulong AllocatedSize;    // 0x28
-        public ulong RealSize;         // 0x30
-        public ulong InitializedSize;  // 0x38
+        public long AllocatedSize;    // 0x28
+        public long RealSize;         // 0x30
+        public long InitializedSize;  // 0x38
 
         // Name / Data Runs follow depending on NameLength
     }

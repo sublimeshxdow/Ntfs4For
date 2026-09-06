@@ -60,7 +60,7 @@ namespace Nternal.Attributes
 
     public class ReparseAttribute : NtfsAttribute
     {
-        public override void ParseFromAccessor()
+        public override void ParseFromAccessor(bool paranoid)
         {
             Span<byte> buffer = new byte[Accessor.Length];
             Accessor.ReadExactly(0, buffer);

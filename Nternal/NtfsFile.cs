@@ -6,14 +6,16 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using Nternal.Core.Streams;
+using Nternal.Helpers;
 
 namespace Nternal.Attributes
 {
-    public class FileRecord : RawFileRecord
+    public class NtfsFile : GenericFileRecord
     {
         public List<NtfsAttribute> NtfsAttributes = [];
 
-        public FileRecord(ReadOnlySpan<byte> buffer, bool postXP = true) : base(buffer, postXP)
+        public NtfsFile(ReadOnlySpan<byte> buffer, IDataStream underlying, bool postXP = true) : base(buffer, postXP)
         {
             ushort offsetToAttribute = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x14, 2));
             ReadOnlySpan<byte> attributeBuffer = buffer.Slice(offsetToAttribute, buffer.Length - offsetToAttribute);
@@ -38,10 +40,10 @@ namespace Nternal.Attributes
                 {
                     RawNonResidentAttributeHeader nonResidentHeader = MemoryMarshal.Cast<byte, RawNonResidentAttributeHeader>(attributeBuffer)[0];
                     ReadOnlySpan<byte> dataRuns = attributeBuffer.Slice(nonResidentHeader.DataRunsOffset, (int)(header.Length - nonResidentHeader.DataRunsOffset));
-                    ParseNonResidentAttribute(nonResidentHeader, name, dataRuns);
+                    ParseNonResidentAttribute(nonResidentHeader, name, dataRuns, underlying);
                 }
 
-                attributeBuffer = attributeBuffer.Slice(attributeBuffer.Length);
+                attributeBuffer = attributeBuffer.Slice((int)header.Length);
             }
         }
 
@@ -59,9 +61,38 @@ namespace Nternal.Attributes
             });
         }
 
-        private void ParseNonResidentAttribute(RawNonResidentAttributeHeader header, string name, ReadOnlySpan<byte> dataruns)
+        private void ParseNonResidentAttribute(RawNonResidentAttributeHeader header, string name, ReadOnlySpan<byte> dataruns, IDataStream underlying)
         {
-            throw new NotImplementedException();
+            var extent = RunHelpers.GetExtentOfNrh(header, dataruns);
+
+            var matchingAttribute = GetMatchingAttribute(header, name);
+            if (matchingAttribute != null)
+            {
+                var stream = matchingAttribute.Accessor as NonResidentDataStream;
+                if (stream == null)
+                    throw new InvalidOperationException(
+                        $"Found an existing, corresponding attribute to the one attempted to parse"
+                        + $" (Type={matchingAttribute.Type}, Name={matchingAttribute.Name}, <=> Type={header.Common.Type}, Name={name})"
+                        + $", but the found accessor is not a NonResidentDataStream, but of type {matchingAttribute.Accessor.GetType().ToString()} - this should never happen on a healthy volume!");
+                
+                stream.AddExtent(extent);
+            }
+            else
+            {
+                var attribute = new NtfsAttribute()
+                {
+                    Type = header.Common.Type,
+                    IsNonResident = true,
+                    Flags = header.Common.Flags,
+                    Id = header.Common.AttributeId,
+                    Name = name,
+
+                    Accessor = new NonResidentDataStream(underlying)
+                };
+                
+                ((NonResidentDataStream)attribute.Accessor).AddExtent(extent);
+                NtfsAttributes.Add(attribute);
+            }
         }
 
         private NtfsAttribute? GetMatchingAttribute(RawNonResidentAttributeHeader header, string name)
@@ -69,10 +100,7 @@ namespace Nternal.Attributes
             return NtfsAttributes
                 .Where(x => x.Type == header.Common.Type)
                 .Where(x => x.Id == header.Common.AttributeId)
-                .Where(x => x.Name == name)
-                .FirstOrDefault();
+                .FirstOrDefault(x => x.Name == name);
         }
-
-
     }
 }

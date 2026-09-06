@@ -16,7 +16,7 @@ namespace Nternal.Attributes
 
         public required IDataStream Accessor { get; set; }
 
-        public virtual void ParseFromAccessor()
+        public virtual void ParseFromAccessor(bool paranoid)
         {
             throw new NotImplementedException();
         }

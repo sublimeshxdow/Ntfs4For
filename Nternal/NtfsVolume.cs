@@ -1,6 +1,7 @@
 ﻿using Nternal.Streams;
 using Nternal.Core.Streams;
 using System.Diagnostics;
+using Nternal.Attributes;
 
 namespace Nternal
 {
@@ -26,5 +27,9 @@ namespace Nternal
             _provider.ReadExactly(0, bootSector);
             BootSector = new(bootSector);
         }
+
+        internal IDataStream GetUnderlyingStream() => _provider;
+        
+        public NtfsFile Mft { get; private set; }
     }
 }

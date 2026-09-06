@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Nternal.Helpers
 {
-    public class FixupUtils
+    public class FixupHelpers
     {
         public class NtfsFixupException : Exception
         {
