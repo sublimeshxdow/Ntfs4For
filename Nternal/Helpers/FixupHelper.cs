@@ -6,14 +6,21 @@ using System.Text;
 
 namespace Nternal.Helpers
 {
-    public class FixupHelpers
+    public class FixupHelper
     {
         public class NtfsFixupException : Exception
         {
             public NtfsFixupException(string message = "") : base(message) { }
         }
 
-        public static void FixupRecord(Span<byte> record, ushort bytesPerSector)
+        public readonly ushort BytesPerSector;
+        
+        public FixupHelper(ushort bytesPerSector)
+        {
+            BytesPerSector = bytesPerSector;
+        }
+
+        public void FixupRecord(Span<byte> record)
         {
             // Confirmed this is the case for both $Mft-Records & Index-Buffers
             ushort offsetToUs = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(0x04, 0x02));
@@ -24,7 +31,7 @@ namespace Nternal.Helpers
 
             for (int i = 0; i < sectorUsa.Length; i++)
             {
-                var sectorUsnSlice = record.Slice((i + 1) * bytesPerSector - 2, 2);
+                var sectorUsnSlice = record.Slice((i + 1) * BytesPerSector - 2, 2);
                 ushort currentEosValue = BinaryPrimitives.ReadUInt16LittleEndian(sectorUsnSlice);
 
                 if (currentEosValue != usn)

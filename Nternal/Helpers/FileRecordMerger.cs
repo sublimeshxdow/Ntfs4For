@@ -74,7 +74,8 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file)
             Id = header.Common.AttributeId,
             Name = name,
 
-            Accessor = new ResidentDataStream(data.ToArray())
+            Accessor = new ResidentDataStream(data.ToArray()),
+            BytesPerCluster = _volume.BootSector.BytesPerCluster
         });
     }
 
@@ -104,7 +105,8 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file)
                 Id = header.Common.AttributeId,
                 Name = name,
 
-                Accessor = new NonResidentDataStream(_volume.GetUnderlyingStream())
+                Accessor = new NonResidentDataStream(_volume.GetUnderlyingStream()),
+                BytesPerCluster = _volume.BootSector.BytesPerCluster
             };
                 
             ((NonResidentDataStream)attribute.Accessor).AddExtent(extent);

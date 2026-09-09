@@ -37,7 +37,7 @@ namespace Nternal.Streams
             _data.AsSpan((int)position, buffer.Length).CopyTo(buffer);
         }
 
-        public bool TryGetMemory(out ReadOnlyMemory<byte> memory)
+        public bool TryGetMemory(out Span<byte> memory)
         {
             memory = _data;
             return true;

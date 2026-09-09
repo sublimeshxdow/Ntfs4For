@@ -44,7 +44,7 @@ namespace Nternal.Partitioning
                 throw new InvalidOperationException($"Failed to read the exact number of bytes (required={buffer.Length}, read={read}).");
         }
 
-        public bool TryGetMemory(out ReadOnlyMemory<byte> memory)
+        public bool TryGetMemory(out Span<byte> memory)
         {
             if (Underlying.TryGetMemory(out var underlying))
             {

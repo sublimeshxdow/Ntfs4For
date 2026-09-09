@@ -13,10 +13,13 @@ namespace Nternal.Attributes
 {
     public class NtfsFile : GenericFileRecord
     {
+        private readonly NtfsBootSector RelatedBootSector;
         public List<NtfsAttribute> NtfsAttributes = [];
 
-        public NtfsFile(ReadOnlySpan<byte> buffer, IDataStream underlying, bool postXP = true) : base(buffer, postXP)
+        public NtfsFile(ReadOnlySpan<byte> buffer, IDataStream underlying, NtfsBootSector relatedBootSector, bool postXP = true) : base(buffer, postXP)
         {
+            RelatedBootSector = relatedBootSector;
+            
             ushort offsetToAttribute = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x14, 2));
             ReadOnlySpan<byte> attributeBuffer = buffer.Slice(offsetToAttribute, buffer.Length - offsetToAttribute);
 
@@ -57,7 +60,8 @@ namespace Nternal.Attributes
                 Id = header.Common.AttributeId,
                 Name = name,
 
-                Accessor = new ResidentDataStream(data.ToArray())
+                Accessor = new ResidentDataStream(data.ToArray()),
+                BytesPerCluster = RelatedBootSector.BytesPerCluster
             });
         }
 
@@ -87,7 +91,8 @@ namespace Nternal.Attributes
                     Id = header.Common.AttributeId,
                     Name = name,
 
-                    Accessor = new NonResidentDataStream(underlying)
+                    Accessor = new NonResidentDataStream(underlying),
+                    BytesPerCluster = RelatedBootSector.BytesPerCluster
                 };
                 
                 ((NonResidentDataStream)attribute.Accessor).AddExtent(extent);

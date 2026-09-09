@@ -15,6 +15,7 @@ namespace Nternal.Attributes
         public string Name { get; init; } = "";
 
         public required IDataStream Accessor { get; set; }
+        public int BytesPerCluster { get; init; }
 
         public virtual void ParseFromAccessor(bool paranoid)
         {

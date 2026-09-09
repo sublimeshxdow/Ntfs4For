@@ -8,6 +8,6 @@
         int Read(long position, Span<byte> buffer);
         void ReadExactly(long position, Span<byte> buffer);
 
-        bool TryGetMemory(out ReadOnlyMemory<byte> memory);
+        bool TryGetMemory(out Span<byte> memory);
     }
 }

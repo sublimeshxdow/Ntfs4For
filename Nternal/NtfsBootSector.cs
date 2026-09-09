@@ -2,6 +2,7 @@
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Nternal.Ntfs.Utils.DecodingUtils;
 
 namespace Nternal
 {
@@ -77,10 +78,10 @@ namespace Nternal
         /// a positive value is a cluster count (multiply by <see cref="BytesPerCluster"/>);
         /// a negative value N means the size is 2^|N| bytes directly.
         /// </summary>
-        public int FileRecordSize => ResolveSize(RawClustersPerFileRecord, BytesPerCluster);
+        public int FileRecordSize => RawOrLogEncoding.ResolveSize(RawClustersPerFileRecord, BytesPerCluster);
 
         /// <summary>Size in bytes of a single index-record buffer, resolved the same way as <see cref="FileRecordSize"/>.</summary>
-        public int IndexBufferSize => ResolveSize(RawClustersPerIndexBuffer, BytesPerCluster);
+        public int IndexBufferSize => RawOrLogEncoding.ResolveSize(RawClustersPerIndexBuffer, BytesPerCluster);
 
         /// <summary>True when the OEM ID and end-of-sector marker both match a genuine NTFS boot sector.</summary>
         public bool IsValid => OemId == ExpectedOemId && BootSignature == ExpectedBootSignature;
@@ -139,9 +140,6 @@ namespace Nternal
             bootSector = candidate;
             return true;
         }
-
-        private static int ResolveSize(sbyte raw, int bytesPerCluster)
-            => raw > 0 ? raw * bytesPerCluster : 1 << -raw;
 
         public override string ToString()
             => $"NTFS Volume [{OemId.TrimEnd()}] {TotalBytes / (1024.0 * 1024 * 1024):F2} GiB, "

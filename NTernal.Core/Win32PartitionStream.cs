@@ -55,7 +55,7 @@ namespace Nternal.Core
             }
         }
 
-        public bool TryGetMemory(out ReadOnlyMemory<byte> memory)
+        public bool TryGetMemory(out Span<byte> memory)
         {
             memory = default;
             return false;
