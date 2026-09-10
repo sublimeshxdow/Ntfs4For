@@ -10,6 +10,7 @@ namespace Nternal.Streams
         private byte[] _data;
 
         public long Length => _data.Length;
+        public long AllocatedLength => _data.Length;
         public int Alignment => 1;
 
         public ResidentDataStream(byte[] data)

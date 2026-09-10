@@ -33,7 +33,10 @@ namespace Nternal
         }
 
         internal IDataStream GetUnderlyingStream() => _provider;
+
+        private bool _hasParsedMftYet = false;
+        private IDataStream? _mftStream = null;
         
-        public NtfsFile Mft { get; private set; }
+        public NtfsFile? Mft { get; private set; }
     }
 }

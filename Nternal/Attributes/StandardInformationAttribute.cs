@@ -1,15 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Nternal.Ntfs.Attributes;
 
 namespace Nternal.Attributes
 {
-    public class StandardInformationAttribute : NtfsAttribute
+    public class StandardInformationAttribute : IParsableAttribute
     {
-        public override void ParseFromAccessor(bool paranoid)
+        public NtfsAttribute Underlying { get; init; } = null!;
+
+        public void ParseFromAccessor(bool paranoid)
         {
-            Span<byte> data = new byte[Accessor.Length];
-            Accessor.ReadExactly(0, data);
+            var accessor = Underlying.Accessor;
+            Span<byte> data = new byte[accessor.AllocatedLength];
+            accessor.ReadExactly(0, data);
 
             FileCreation = DateTime.FromFileTimeUtc(BitConverter.ToInt64(data.Slice(0, 8)));
             FileAltered = DateTime.FromFileTimeUtc(BitConverter.ToInt64(data.Slice(8, 8)));
@@ -20,13 +24,13 @@ namespace Nternal.Attributes
             VersionNumber = BitConverter.ToUInt32(data.Slice(40, 4));
             ClassId = BitConverter.ToUInt32(data.Slice(44, 4));
 
-            if (Accessor.Length >= 52)
+            if (accessor.Length >= 52)
                 OwnerId = BitConverter.ToUInt32(data.Slice(48, 4));
-            if (Accessor.Length >= 56)
+            if (accessor.Length >= 56)
                 SecurityId = BitConverter.ToUInt32(data.Slice(52, 4));
-            if (Accessor.Length >= 64)
+            if (accessor.Length >= 64)
                 QuotaCharged = BitConverter.ToUInt64(data.Slice(56, 8));
-            if (Accessor.Length >= 72)
+            if (accessor.Length >= 72)
                 UpdateSequenceNumber = BitConverter.ToUInt64(data.Slice(64, 8));
         }
 

@@ -4,8 +4,10 @@ using Nternal.Extensions;
 
 namespace Nternal.Ntfs.Attributes;
 
-public class VolumeInformationAttribute : NtfsAttribute
+public class VolumeInformationAttribute : IParsableAttribute
 {
+    public NtfsAttribute Underlying { get; init; } = null!;
+
     [Flags]
     public enum VolumeFlags : ushort
     {
@@ -33,9 +35,9 @@ public class VolumeInformationAttribute : NtfsAttribute
     public byte MinorVersion { get; private set; }
     public VolumeFlags Flags { get; private set; }
     
-    public override void ParseFromAccessor(bool paranoid)
+    public void ParseFromAccessor(bool paranoid)
     {
-        long length = Accessor.Length;
+        long length = Underlying.Accessor.AllocatedLength;
         if (paranoid && length != 12)
         {
             if (paranoid)
@@ -45,7 +47,7 @@ public class VolumeInformationAttribute : NtfsAttribute
         }
         
         Span<byte> data = stackalloc byte[(int)length];
-        Accessor.ReadExactly(0, data);
+        Underlying.Accessor.ReadExactly(0, data);
 
         MajorVersion = data[8];
         MinorVersion = data[9];

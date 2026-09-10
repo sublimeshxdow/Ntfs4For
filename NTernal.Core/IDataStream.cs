@@ -3,6 +3,7 @@
     public interface IDataStream : IDisposable
     {
         long Length { get; }
+        long AllocatedLength { get; }
         int Alignment { get; }
 
         int Read(long position, Span<byte> buffer);

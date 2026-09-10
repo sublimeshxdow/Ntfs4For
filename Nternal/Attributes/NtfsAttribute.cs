@@ -3,6 +3,8 @@ using Nternal.Core.Streams;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Nternal.Ntfs;
+using Nternal.Ntfs.Attributes;
 
 namespace Nternal.Attributes
 {
@@ -16,10 +18,25 @@ namespace Nternal.Attributes
 
         public required IDataStream Accessor { get; set; }
         public int BytesPerCluster { get; init; }
-
-        public virtual void ParseFromAccessor(bool paranoid)
+        
+        public T Cast<T>(bool paranoid = true) where T : IParsableAttribute, new()
         {
-            throw new NotImplementedException();
+            var attribute = new T
+            {
+                Underlying = this
+            };
+            attribute.ParseFromAccessor(paranoid);
+            return attribute;
+        }
+        
+        public T CastRaw<T>(bool paranoid = true) where T : IRawAttribute, new()
+        {
+            var attribute = new T
+            {
+                Underlying = this
+            };
+            
+            return attribute;
         }
     }
 }

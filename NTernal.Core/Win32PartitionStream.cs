@@ -8,6 +8,7 @@ namespace Nternal.Core
         private readonly SafeFileHandle _handle;
 
         public long Length { get; }
+        public long AllocatedLength { get; }
         public int Alignment => 512;
 
         public Win32PartitionStream(string devicePath, long length)
@@ -20,6 +21,7 @@ namespace Nternal.Core
                 FileOptions.RandomAccess);
 
             Length = length;
+            AllocatedLength = length;
         }
 
         public int Read(long position, Span<byte> buffer)

@@ -7,24 +7,24 @@ namespace Nternal.Structs
 {
     public class GenericFileRecord
     {
-        public GenericFileRecord(ReadOnlySpan<byte> buffer, bool postXp = true)
+        public GenericFileRecord(ReadOnlySpan<byte> fullBuffer, bool postXp = true)
         {
-            if (buffer.Length < 0x30)
-                throw new ArgumentException("Buffer must contain at least 48 bytes.", nameof(buffer));
+            if (fullBuffer.Length < 0x30)
+                throw new ArgumentException("Buffer must contain at least 48 bytes.", nameof(fullBuffer));
 
-            MagicNumber = Encoding.ASCII.GetString(buffer.Slice(0x00, 4));
-            Lsn = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0x08, 8));
-            SequenceNumber = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x10, 2));
-            NumberOfHardlinks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x12, 2));
-            OffsetToAttributes = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x14, 2));
-            Flags = (FileRecordFlags)BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x16, 2));
-            RealSizeOfRecord = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0x18, 4));
-            AllocatedSizeOfRecord = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0x1C, 4));
-            BaseFileReference = new FileReference(BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0x20, 8)));
-            NextAttributeId = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x28, 2));
+            MagicNumber = Encoding.ASCII.GetString(fullBuffer.Slice(0x00, 4));
+            Lsn = BinaryPrimitives.ReadUInt64LittleEndian(fullBuffer.Slice(0x08, 8));
+            SequenceNumber = BinaryPrimitives.ReadUInt16LittleEndian(fullBuffer.Slice(0x10, 2));
+            NumberOfHardlinks = BinaryPrimitives.ReadUInt16LittleEndian(fullBuffer.Slice(0x12, 2));
+            OffsetToAttributes = BinaryPrimitives.ReadUInt16LittleEndian(fullBuffer.Slice(0x14, 2));
+            Flags = (FileRecordFlags)BinaryPrimitives.ReadUInt16LittleEndian(fullBuffer.Slice(0x16, 2));
+            RealSizeOfRecord = BinaryPrimitives.ReadUInt32LittleEndian(fullBuffer.Slice(0x18, 4));
+            AllocatedSizeOfRecord = BinaryPrimitives.ReadUInt32LittleEndian(fullBuffer.Slice(0x1C, 4));
+            BaseFileReference = new FileReference(BinaryPrimitives.ReadUInt64LittleEndian(fullBuffer.Slice(0x20, 8)));
+            NextAttributeId = BinaryPrimitives.ReadUInt16LittleEndian(fullBuffer.Slice(0x28, 2));
 
             if (postXp)
-                NumberOfMftRecord = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0x2C, 4));
+                NumberOfMftRecord = BinaryPrimitives.ReadUInt32LittleEndian(fullBuffer.Slice(0x2C, 4));
         }
 
         public string MagicNumber { get; } = "";

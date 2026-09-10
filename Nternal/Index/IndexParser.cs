@@ -26,14 +26,14 @@ public class IndexParser
     public IndexEntry? TryFindRootEntry(ReadOnlySpan<byte> key)
     {
         // We start inside the index root :)
-        if (_paranoid && _indexRoot.IsNonResident)
+        if (_paranoid && _indexRoot.Underlying.IsNonResident)
             throw new InvalidDataException(
                 $"Expected $Index_Root to be resident, but came out as non-resident - this should never be the case!");
 
-        if (!_indexRoot.Accessor.TryGetMemory(out Span<byte> buffer))
+        if (!_indexRoot.Underlying.Accessor.TryGetMemory(out Span<byte> buffer))
         {
-            buffer = new byte[_indexRoot.Accessor.Length];
-            _indexRoot.Accessor.ReadExactly(0, buffer);
+            buffer = new byte[_indexRoot.Underlying.Accessor.Length];
+            _indexRoot.Underlying.Accessor.ReadExactly(0, buffer);
         }
 
         int offset = 16 + _indexRoot.OffsetToFirstEntry;
@@ -54,7 +54,7 @@ public class IndexParser
                 return null;
 
         Span<byte> indexBuffer = new byte[_indexRoot.BytesPerIndexBlock];
-        _indexAllocation.Accessor.ReadExactly(node * indexBuffer.Length, indexBuffer);
+        _indexAllocation.GetStream().ReadExactly(node * indexBuffer.Length, indexBuffer);
         _fixupHelper.FixupRecord(indexBuffer);
         return TraverseIndexTree(indexBuffer, key);
     }

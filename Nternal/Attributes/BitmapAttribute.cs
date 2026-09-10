@@ -3,18 +3,19 @@ using Nternal.Attributes;
 
 namespace Nternal.Ntfs.Attributes;
 
-public class BitmapAttribute : NtfsAttribute
+public class BitmapAttribute : IParsableAttribute
 {
+    public NtfsAttribute Underlying { get; init; } = null!;
     private ulong[]? _bitData;
 
-    public override void ParseFromAccessor(bool paranoid)
+    public void ParseFromAccessor(bool paranoid)
     {
         if (!BitConverter.IsLittleEndian)
             throw new PlatformNotSupportedException("Bitmap bit-ordering assumes a little-endian host.");
         
-        _bitData = new ulong[(int)((Accessor.Length + 7) / 8)];
+        _bitData = new ulong[(int)(Underlying.Accessor.AllocatedLength / 8)];
         Span<byte> data = MemoryMarshal.Cast<ulong, byte>(_bitData.AsSpan());
-        Accessor.ReadExactly(0, data);
+        Underlying.Accessor.ReadExactly(0, data);
     }
 
     public bool IsSet(long index)

@@ -3,7 +3,8 @@ using Nternal.Core.Streams;
 
 namespace Nternal.Ntfs.Attributes;
 
-public class DataAttribute : NtfsAttribute
+public class DataAttribute : IRawAttribute
 {
-    public IDataStream GetDataStream() => Accessor;
+    public NtfsAttribute Underlying { get; init; } = null!;
+    public IDataStream GetStream() => Underlying.Accessor;
 }

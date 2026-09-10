@@ -3,14 +3,16 @@ using Nternal.Ntfs.Security;
 
 namespace Nternal.Ntfs.Attributes;
 
-public class SecurityDescriptorAttribute : NtfsAttribute
+public class SecurityDescriptorAttribute : IParsableAttribute
 {
+    public NtfsAttribute Underlying { get; init; } = null!;
+    
     public SecurityDescriptor Descriptor { get; private set; }
 
-    public override void ParseFromAccessor(bool paranoid)
+    public void ParseFromAccessor(bool paranoid)
     {
-        Span<byte> data = new byte[Accessor.Length];
-        Accessor.ReadExactly(0, data);
+        Span<byte> data = new byte[Underlying.Accessor.AllocatedLength];
+        Underlying.Accessor.ReadExactly(0, data);
         Descriptor = new SecurityDescriptor(data, paranoid);
     }
 }

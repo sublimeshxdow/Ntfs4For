@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using Nternal.Ntfs.Attributes;
 
 namespace Nternal.Attributes
 {
@@ -58,12 +59,14 @@ namespace Nternal.Attributes
 
     }
 
-    public class ReparseAttribute : NtfsAttribute
+    public class ReparseAttribute(NtfsAttribute underlying) : IParsableAttribute
     {
-        public override void ParseFromAccessor(bool paranoid)
+        public NtfsAttribute Underlying { get; init; } = null!;
+
+        public void ParseFromAccessor(bool paranoid)
         {
-            Span<byte> buffer = new byte[Accessor.Length];
-            Accessor.ReadExactly(0, buffer);
+            Span<byte> buffer = new byte[Underlying.Accessor.AllocatedLength];
+            Underlying.Accessor.ReadExactly(0, buffer);
 
             TypeAndFlags = (ReparseTypeAndFlags)buffer.ReadUInt32();
             ushort reparseLength = buffer.ReadUInt16(4);

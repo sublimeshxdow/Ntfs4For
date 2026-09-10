@@ -68,7 +68,7 @@ public class I30IndexEntry : IndexEntry
 {
     public I30IndexEntry(ReadOnlyMemory<byte> fullData, IndexRootAttribute root) : base(fullData, root)
     {
-        if (root.Type != NtfsAttributeType.FileName)
+        if (root.IndexedType != NtfsAttributeType.FileName)
             throw new InvalidOperationException(
                 "Attempted to create an I30-Index-Entry with an index-root indexing another type of data!");
     }

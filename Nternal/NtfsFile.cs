@@ -8,20 +8,25 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Nternal.Core.Streams;
 using Nternal.Helpers;
+using Nternal.Ntfs;
+using Nternal.Ntfs.Attributes;
+using Nternal.Ntfs.Helpers;
 
 namespace Nternal.Attributes
 {
-    public class NtfsFile : GenericFileRecord
+    public class NtfsFile
     {
-        private readonly NtfsBootSector RelatedBootSector;
-        public List<NtfsAttribute> NtfsAttributes = [];
+        private readonly NtfsVolume _ntfsVolume;
 
-        public NtfsFile(ReadOnlySpan<byte> buffer, IDataStream underlying, NtfsBootSector relatedBootSector, bool postXP = true) : base(buffer, postXP)
+        public readonly RawFileRecord FileRecord;
+        public readonly List<NtfsAttribute> NtfsAttributes = [];
+
+        public NtfsFile(RawFileRecord record, IDataStream underlying, NtfsVolume ntfsVolume, bool postXP = true)
         {
-            RelatedBootSector = relatedBootSector;
+            _ntfsVolume = ntfsVolume;
+            FileRecord = record;
             
-            ushort offsetToAttribute = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(0x14, 2));
-            ReadOnlySpan<byte> attributeBuffer = buffer.Slice(offsetToAttribute, buffer.Length - offsetToAttribute);
+            ReadOnlySpan<byte> attributeBuffer = record.AttributeData;
 
             while (true)
             {
@@ -48,6 +53,26 @@ namespace Nternal.Attributes
 
                 attributeBuffer = attributeBuffer.Slice((int)header.Length);
             }
+            
+            ProcessAttributeListIfPresent();
+        }
+
+        public T? GetAttributeStream<T>(NtfsAttributeType type, string name) where T : IRawAttribute, new()
+        {
+            var attribute = NtfsAttributes
+                .Where(x => x.Name == name)
+                .FirstOrDefault(x => x.Type == type);
+
+            return attribute == null ? default : attribute.CastRaw<T>();
+        }
+        
+        public T? GetAttributeData<T>(NtfsAttributeType type, string name) where T : IParsableAttribute, new()
+        {
+            var attribute = NtfsAttributes
+                .Where(x => x.Name == name)
+                .FirstOrDefault(x => x.Type == type);
+
+            return attribute == null ? default : attribute.Cast<T>();
         }
 
         private void ParseResidentAttribute(RawResidentAttributeHeader header, string name, ReadOnlySpan<byte> data)
@@ -61,7 +86,7 @@ namespace Nternal.Attributes
                 Name = name,
 
                 Accessor = new ResidentDataStream(data.ToArray()),
-                BytesPerCluster = RelatedBootSector.BytesPerCluster
+                BytesPerCluster = _ntfsVolume.BootSector.BytesPerCluster
             });
         }
 
@@ -91,8 +116,8 @@ namespace Nternal.Attributes
                     Id = header.Common.AttributeId,
                     Name = name,
 
-                    Accessor = new NonResidentDataStream(underlying),
-                    BytesPerCluster = RelatedBootSector.BytesPerCluster
+                    Accessor = new NonResidentDataStream(underlying, _ntfsVolume.BootSector.BytesPerCluster),
+                    BytesPerCluster = _ntfsVolume.BootSector.BytesPerCluster
                 };
                 
                 ((NonResidentDataStream)attribute.Accessor).AddExtent(extent);
@@ -106,6 +131,20 @@ namespace Nternal.Attributes
                 .Where(x => x.Type == header.Common.Type)
                 .Where(x => x.Id == header.Common.AttributeId)
                 .FirstOrDefault(x => x.Name == name);
+        }
+
+        private void ProcessAttributeListIfPresent()
+        {
+            var attributeList = NtfsAttributes.FirstOrDefault(x => x.Type == NtfsAttributeType.AttributeList);
+            if (attributeList == null)
+                return;
+
+            var data = attributeList.Cast<AttributeListAttribute>();
+            data.ParseFromAccessor( true);
+
+            FileRecordMerger merger = new(_ntfsVolume, this, _ntfsVolume.Mft == null);
+            foreach (var entry in data.Entries)
+                merger.MergeListedEntry(entry);
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using Nternal.Ntfs.Attributes;
 
 namespace Nternal.Attributes
 {
@@ -20,8 +21,10 @@ namespace Nternal.Attributes
         AesWrapped = 1,
     }
 
-    public class LoggedUtilityStream : NtfsAttribute
+    public class LoggedUtilityStreamAttribute : IParsableAttribute
     {
+        public NtfsAttribute Underlying { get; init; } = null!;
+
         // ---- Outer header offsets (MS-EFSR 2.2.2.1 -- spec-documented) ----
         private const int LengthOffset = 0x00;
         private const int VersionOffset = 0x08;
@@ -73,10 +76,10 @@ namespace Nternal.Attributes
         public List<KeyEntry> DDFKeys { get; set; }
         public List<KeyEntry> DRFKeys { get; set; }
 
-        public override void ParseFromAccessor(bool paranoid)
+        public void ParseFromAccessor(bool paranoid)
         {
-            Span<byte> buffer = new byte[Accessor.Length];
-            Accessor.ReadExactly(0, buffer);
+            Span<byte> buffer = new byte[Underlying.Accessor.AllocatedLength];
+            Underlying.Accessor.ReadExactly(0, buffer);
 
             int length = BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(LengthOffset, 4));
             if (buffer.Length < length)
