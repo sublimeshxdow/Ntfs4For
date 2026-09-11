@@ -5,43 +5,48 @@ using Nternal.Attributes;
 using Nternal.Core.Streams;
 using Nternal.Helpers;
 using Nternal.Ntfs.Attributes;
+using Nternal.Ntfs.Index;
 using Nternal.Structs;
 
 namespace Nternal
 {
     public partial class NtfsVolume
     {
-        public RawFileRecord GetRawRecordData(FileReference reference, bool paranoid = true, bool fixup = true, IDataStream? mft = null)
+        public RawFileRecord GetRawRecordData(FileReference reference, bool paranoid = true,
+            bool compareSequence = true, bool fixup = true, IDataStream? mft = null)
         {
             if (_hasParsedMftYet)
             {
                 var bitmapAttr = Mft.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, "");
                 if (bitmapAttr == null)
-                    throw new InvalidOperationException($"$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
-                
+                    throw new InvalidOperationException(
+                        $"$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
+
                 if (!bitmapAttr.IsSet((long)reference.FileRecordId))
                     throw new Exception($"Attempted to parse an unused $Mft-Record!");
             }
 
             var mftStream = mft ?? Mft.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
             if (mftStream == null)
-                throw new InvalidOperationException($"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
+                throw new InvalidOperationException(
+                    $"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
 
             long clusterWithRecord = (long)reference.FileRecordId / 4;
             int index = (int)(reference.FileRecordId % 4);
             int recordOffset = index * BootSector.FileRecordSize;
-            
+
             Span<byte> fileRecordCluster = new byte[BootSector.BytesPerCluster];
             mftStream.ReadExactly(clusterWithRecord * BootSector.BytesPerCluster, fileRecordCluster);
             Span<byte> fileRecord = fileRecordCluster[recordOffset..(recordOffset + BootSector.FileRecordSize)];
-            
-            if(fixup)
+
+            if (fixup)
                 FixupHelper.FixupRecord(fileRecord);
 
             var rawRecord = new RawFileRecord(fileRecord);
-            if (_hasParsedMftYet && rawRecord.SequenceNumber != reference.SequenceNumber)
-                throw new ArgumentException($"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!");
-                
+            if (compareSequence && rawRecord.SequenceNumber != reference.SequenceNumber)
+                throw new ArgumentException(
+                    $"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!");
+
             return rawRecord;
         }
 
@@ -50,26 +55,60 @@ namespace Nternal
             var raw = GetRawRecordData(reference);
             return new NtfsFile(raw, _provider, this);
         }
-        
+
         public void ParseMft(bool paranoid = true, bool fixup = true, bool postXp = true)
         {
             var raw = GetMftRecord(paranoid, fixup);
             Mft = new NtfsFile(raw, _provider, this, postXp);
             _hasParsedMftYet = true;
         }
-        
+
+        public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
+        {
+            var rawRecord = GetRawRecordData(reference, true, compareSequence, true);
+            return new NtfsFile(rawRecord, _provider, this, true);
+        }
+
+        public NtfsFile GetNtfsFile(string path)
+        {
+            if (RootFolder == null)
+                throw new InvalidOperationException(
+                    $"Cannot parse arbitrary ntfs file before initialization completed!");
+
+            path = path.Trim('/');
+            NtfsFile file = RootFolder;
+            string currentPath = "/";
+
+            foreach (string entry in path.Split('/'))
+            {
+                IndexParser parser = CreateIndexParser(file, "$I30");
+                var indexEntry = parser.TryFindRootEntry(Encoding.Unicode.GetBytes(entry));
+
+                if (indexEntry == null)
+                    throw new FileNotFoundException($"Failed to find file/folder \"{entry}\" at \"{currentPath}\"!");
+
+                file = GetNtfsFile(indexEntry.GetI30MftReference()!.Value, true);
+                currentPath += $"/{entry}";
+            }
+
+            return file;
+        }
+
         private RawFileRecord GetMftRecord(bool paranoid = true, bool fixup = true)
         {
             Span<byte> mftRecord = BootSector.FileRecordSize <= 1024
                 ? stackalloc byte[BootSector.FileRecordSize]
                 : new byte[BootSector.FileRecordSize];
-            
+
             _provider.ReadExactly(BootSector.MftClusterNumber * BootSector.BytesPerCluster, mftRecord);
-            
+
             if (fixup)
                 FixupHelper.FixupRecord(mftRecord);
 
             return new RawFileRecord(mftRecord);
         }
+
+        private IndexParser CreateIndexParser(NtfsFile file, string index) =>
+            new IndexParser(file, index, CollationHandler, FixupHelper);
     }
 }

@@ -12,31 +12,35 @@ public class IndexEntry : IComparable<IndexEntry>
         HasSubnode = 0x0001,
         IsLast = 0x0002
     }
-    
+
     public IndexFlags Flags { get; }
 
-    protected FileReference? FileReference { get;  }
+    protected FileReference? FileReference { get; }
 
     protected ReadOnlyMemory<byte> _FullData { get; }
     public ReadOnlySpan<byte> RawData => _FullData.Span;
     public ushort EntryLength { get; }
 
     public long? SubnodeVcn { get; }
-    
+
     public ReadOnlySpan<byte> GetKey()
     {
         var keyLength = RawData.ReadUInt16(10);
         return RawData[16..(16 + keyLength)];
     }
 
-    public ReadOnlySpan<byte> GetData() => RawData[RawData.ReadUInt16(0)..(RawData.ReadUInt16(0) + RawData.ReadUInt16(2))];
+    public ReadOnlySpan<byte> GetData() =>
+        RawData[RawData.ReadUInt16(0)..(RawData.ReadUInt16(0) + RawData.ReadUInt16(2))];
 
     protected IndexRootAttribute IndexRoot { get; init; }
+    protected CollationHandler CollationHandler { get; init; }
 
-    public IndexEntry(ReadOnlyMemory<byte> fullData, IndexRootAttribute root)
+    public IndexEntry(ReadOnlyMemory<byte> fullData, IndexRootAttribute root, CollationHandler collationHandler)
     {
         _FullData = fullData;
         IndexRoot = root;
+        CollationHandler = collationHandler;
+
         EntryLength = RawData.ReadUInt16(8);
 
         if (root.IndexedType == NtfsAttributeType.FileName)
@@ -59,23 +63,8 @@ public class IndexEntry : IComparable<IndexEntry>
             throw new InvalidOperationException(
                 $"Attempted to compare index-entries of different collation rules ({IndexRoot.CollationRule} != {other.IndexRoot.CollationRule})");
 
-        return ComparisonUtils.Compare(RawData, other.RawData, IndexRoot.CollationRule);
-    }
-}
-
-public class I30IndexEntry : IndexEntry
-{
-    public I30IndexEntry(ReadOnlyMemory<byte> fullData, IndexRootAttribute root) : base(fullData, root)
-    {
-        if (root.IndexedType != NtfsAttributeType.FileName)
-            throw new InvalidOperationException(
-                "Attempted to create an I30-Index-Entry with an index-root indexing another type of data!");
+        return CollationHandler.Compare(RawData, other.RawData, IndexRoot.CollationRule);
     }
 
-    public KeyValuePair<FileReference, FileNameData> ParseIndexEntry(bool paranoid)
-    {
-        var data = new FileNameData();
-        data.Parse(GetKey(), paranoid);
-        return new KeyValuePair<FileReference, FileNameData>(FileReference!.Value, data);
-    }
+    public FileReference? GetI30MftReference() => FileReference;
 }

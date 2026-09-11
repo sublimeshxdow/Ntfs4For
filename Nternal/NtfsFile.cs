@@ -21,6 +21,9 @@ namespace Nternal.Attributes
         public readonly RawFileRecord FileRecord;
         public readonly List<NtfsAttribute> NtfsAttributes = [];
 
+        public FileReference GetReference() =>
+            new FileReference(FileRecord.NumberOfMftRecord!.Value /*TODO*/, FileRecord.SequenceNumber);
+
         public NtfsFile(RawFileRecord record, IDataStream underlying, NtfsVolume ntfsVolume, bool postXP = true)
         {
             _ntfsVolume = ntfsVolume;
@@ -64,6 +67,11 @@ namespace Nternal.Attributes
                 .FirstOrDefault(x => x.Type == type);
 
             return attribute == null ? default : attribute.Cast<T>();
+        }
+
+        public T GetRequiredAttributeData<T>(NtfsAttributeType type, string name) where T : IParsableAttribute, new()
+        {
+            return GetAttributeData<T>(type, name) ?? throw new KeyNotFoundException($"Could not find attribute \"{name}\" of type {type} in record {GetReference()}!");
         }
 
         private void ParseResidentAttribute(RawResidentAttributeHeader header, string name, ReadOnlySpan<byte> data)

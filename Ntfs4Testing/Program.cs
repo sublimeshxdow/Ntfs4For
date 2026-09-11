@@ -20,18 +20,11 @@ internal class Program
 
         NtfsVolume v = new(stream);
         v.Mount();
-        v.ParseMft();
 
-        var data = v.Mft.GetAttributeData<FileNameAttribute>(NtfsAttributeType.FileName, "");
-        
-        var root = v.ParseFile(new FileReference(5, 5));
-        var parser = new IndexParser(
-            root.GetAttributeData<IndexRootAttribute>(NtfsAttributeType.IndexRoot, "$I30"),
-            root.GetAttributeData<IndexAllocationAttribute>(NtfsAttributeType.IndexAllocation, "$I30"),
-            root.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, "$I30"),
-            true,
-            v.FixupHelper);
-
-        parser.TryFindRootEntry(Encoding.Unicode.GetBytes("PROGRA~3"));
+        var entry = v.GetNtfsFile($"/$AttrDef");
+        var attr = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
+        Span<byte> buffer = new byte[attr.GetStream().Length];
+        attr.GetStream().ReadExactly(0, buffer);
+        File.WriteAllBytes("$Attrdef", buffer.Slice(0, (int)attr.GetStream().Length));
     }
 }

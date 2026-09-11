@@ -5,9 +5,11 @@ using Nternal.Structs;
 
 namespace Nternal.Ntfs.Index;
 
-public static class ComparisonUtils
+public class CollationHandler
 {
-    public static int Compare(ReadOnlySpan<byte> span1, ReadOnlySpan<byte> span2, CollationRules rule)
+    internal char[]? UpCaseTable { get; set; }
+    
+    public int Compare(ReadOnlySpan<byte> span1, ReadOnlySpan<byte> span2, CollationRules rule)
     {
         ReadOnlySpan<byte> firstKey = GetKeyData(span1), secondKey = GetKeyData(span2);
 
@@ -15,8 +17,7 @@ public static class ComparisonUtils
         {
             case CollationRules.CollationBinary: return firstKey.SequenceCompareTo(secondKey);
             case CollationRules.CollationFileName:
-                return string.Compare(GetFileName(span1), GetFileName(span2),
-                    StringComparison.InvariantCultureIgnoreCase);
+                return CompareUpcased(GetFileName(span1), GetFileName(span2));
             case CollationRules.CollationUnicodeString:
                 return string.Compare(DecodeUtf16(firstKey), DecodeUtf16(secondKey), StringComparison.InvariantCulture);
             case CollationRules.CollationNtofsUlong: return firstKey.ReadUInt32(0).CompareTo(secondKey.ReadUInt32(0));
@@ -40,7 +41,7 @@ public static class ComparisonUtils
         }
     }
     
-    public static int CompareToTarget(ReadOnlySpan<byte> fullRawEntry, ReadOnlySpan<byte> target, CollationRules rule)
+    public int CompareToTarget(ReadOnlySpan<byte> fullRawEntry, ReadOnlySpan<byte> target, CollationRules rule)
     {
         ReadOnlySpan<byte> key = GetKeyData(fullRawEntry);
 
@@ -51,7 +52,7 @@ public static class ComparisonUtils
 
             case CollationRules.CollationFileName:
                 Console.WriteLine($"Comparing... {target.ReadUnicodeString(0, target.Length)} to {GetFileName(fullRawEntry)}");
-                return string.Compare(target.ReadUnicodeString(0, target.Length), GetFileName(fullRawEntry), StringComparison.InvariantCultureIgnoreCase);
+                return CompareUpcased(MemoryMarshal.Cast<byte, char>(target), GetFileName(fullRawEntry));
 
             case CollationRules.CollationUnicodeString:
                 return string.Compare(target.ReadUnicodeString(0, target.Length), DecodeUtf16(key), StringComparison.InvariantCulture);
@@ -82,7 +83,25 @@ public static class ComparisonUtils
             default: throw new ArgumentException(nameof(rule), $"Invalid collation rule ({rule})!");
         }
     }
+    
+    public int CompareUpcased(ReadOnlySpan<char> a, ReadOnlySpan<char> b)
+    {
+        Span<char> upA = a.Length <= 260 ? stackalloc char[a.Length] : new char[a.Length];
+        Span<char> upB = b.Length <= 260 ? stackalloc char[b.Length] : new char[b.Length];
+        UpcaseInto(a, upA);
+        UpcaseInto(b, upB);
+        return upA.SequenceCompareTo(upB);
+    }
 
+    public void UpcaseInto(ReadOnlySpan<char> source, Span<char> destination)
+    {
+        if (UpCaseTable == null)
+            throw new InvalidOperationException("Cannot compare filenames before $UpCase has been parsed!");
+
+        for (int i = 0; i < source.Length; i++)
+            destination[i] = UpCaseTable[source[i]];
+    }
+    
     public static byte[] EncodeSearchString(string value) => Encoding.Unicode.GetBytes(value);
 
     private static ReadOnlySpan<byte> GetKeyData(ReadOnlySpan<byte> entry)
