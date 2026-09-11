@@ -47,7 +47,7 @@ public class IndexParser
         if (_indexAllocation == null || _bitmap == null)
             return null;
 
-        if (_bitmap.IsSet(node))
+        if (!_bitmap.IsSet(node))
             if (_paranoid)
                 throw new Exception($"A free sub-node was specified within an index entry!");
             else
@@ -56,7 +56,9 @@ public class IndexParser
         Span<byte> indexBuffer = new byte[_indexRoot.BytesPerIndexBlock];
         _indexAllocation.GetStream().ReadExactly(node * indexBuffer.Length, indexBuffer);
         _fixupHelper.FixupRecord(indexBuffer);
-        return TraverseIndexTree(indexBuffer, key);
+
+        int offset = 0x18 + indexBuffer.ReadUInt16(0x18);
+        return TraverseIndexTree(indexBuffer.Slice(offset), key);
     }
 
     private IndexEntry? TraverseIndexTree(ReadOnlySpan<byte> bufferData, ReadOnlySpan<byte> key)
@@ -83,16 +85,9 @@ public class IndexParser
                 return entry;
 
             // Is it within a sub-node-vcn? 
-            else if (result == -1)
-            {
+            else if (result < 0)
                 // Yes - but do we have a subnode-vcn?
-                if (entry.SubnodeVcn != null)
-                    return TryFindAllocationEntry(entry.SubnodeVcn.Value, key);
-
-                // No => it cannot exist!
-                else
-                    return null;
-            }
+                return entry.SubnodeVcn != null  ? TryFindAllocationEntry(entry.SubnodeVcn.Value, key)  : null;
 
             // Look for next item in root
             bufferData = bufferData.Slice(length);

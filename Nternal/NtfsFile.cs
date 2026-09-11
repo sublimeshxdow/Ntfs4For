@@ -35,7 +35,7 @@ namespace Nternal.Attributes
                     break;
 
                 RawAttributeHeader header = MemoryMarshal.Cast<byte, RawAttributeHeader>(attributeBuffer)[0];
-                string name = Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength));
+                string name = Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength * 2));
 
                 if (header.NonResidentFlag == 0)
                 {
@@ -57,15 +57,6 @@ namespace Nternal.Attributes
             ProcessAttributeListIfPresent();
         }
 
-        public T? GetAttributeStream<T>(NtfsAttributeType type, string name) where T : IRawAttribute, new()
-        {
-            var attribute = NtfsAttributes
-                .Where(x => x.Name == name)
-                .FirstOrDefault(x => x.Type == type);
-
-            return attribute == null ? default : attribute.CastRaw<T>();
-        }
-        
         public T? GetAttributeData<T>(NtfsAttributeType type, string name) where T : IParsableAttribute, new()
         {
             var attribute = NtfsAttributes

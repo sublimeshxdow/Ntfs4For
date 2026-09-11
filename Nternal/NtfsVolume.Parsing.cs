@@ -23,8 +23,7 @@ namespace Nternal
                     throw new Exception($"Attempted to parse an unused $Mft-Record!");
             }
 
-            var mftStream = mft ?? Mft.GetAttributeStream<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
-
+            var mftStream = mft ?? Mft.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
             if (mftStream == null)
                 throw new InvalidOperationException($"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
 
@@ -41,7 +40,7 @@ namespace Nternal
 
             var rawRecord = new RawFileRecord(fileRecord);
             if (_hasParsedMftYet && rawRecord.SequenceNumber != reference.SequenceNumber)
-                throw new ArgumentException($"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {reference.SequenceNumber}!");
+                throw new ArgumentException($"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!");
                 
             return rawRecord;
         }

@@ -28,15 +28,5 @@ namespace Nternal.Attributes
             attribute.ParseFromAccessor(paranoid);
             return attribute;
         }
-        
-        public T CastRaw<T>(bool paranoid = true) where T : IRawAttribute, new()
-        {
-            var attribute = new T
-            {
-                Underlying = this
-            };
-            
-            return attribute;
-        }
     }
 }

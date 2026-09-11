@@ -6,7 +6,7 @@ using Nternal.Structs;
 
 namespace Nternal.Ntfs.Attributes;
 
-public class IndexRootAttribute : IParsableAttribute, IRawAttribute
+public class IndexRootAttribute : IParsableAttribute
 {
     public NtfsAttribute Underlying { get; init; } = null!;
     public IDataStream GetStream() => Underlying.Accessor;

@@ -24,6 +24,14 @@ internal class Program
 
         var data = v.Mft.GetAttributeData<FileNameAttribute>(NtfsAttributeType.FileName, "");
         
-        var mirr = v.ParseFile(new FileReference(1, 1));
+        var root = v.ParseFile(new FileReference(5, 5));
+        var parser = new IndexParser(
+            root.GetAttributeData<IndexRootAttribute>(NtfsAttributeType.IndexRoot, "$I30"),
+            root.GetAttributeData<IndexAllocationAttribute>(NtfsAttributeType.IndexAllocation, "$I30"),
+            root.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, "$I30"),
+            true,
+            v.FixupHelper);
+
+        parser.TryFindRootEntry(Encoding.Unicode.GetBytes("PROGRA~3"));
     }
 }

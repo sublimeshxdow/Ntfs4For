@@ -25,12 +25,11 @@ public class IndexEntry : IComparable<IndexEntry>
     
     public ReadOnlySpan<byte> GetKey()
     {
-        var keyOffset = IndexRoot.IndexedType == NtfsAttributeType.FileName ? 16 : 8;
         var keyLength = RawData.ReadUInt16(10);
-        return RawData[keyOffset..(keyOffset + keyLength)];
+        return RawData[16..(16 + keyLength)];
     }
 
-    public ReadOnlySpan<byte> GetData() => RawData[RawData.ReadUInt16(0)..RawData.ReadUInt16(2)];
+    public ReadOnlySpan<byte> GetData() => RawData[RawData.ReadUInt16(0)..(RawData.ReadUInt16(0) + RawData.ReadUInt16(2))];
 
     protected IndexRootAttribute IndexRoot { get; init; }
 

@@ -50,10 +50,11 @@ public static class ComparisonUtils
                 return key.SequenceCompareTo(target);
 
             case CollationRules.CollationFileName:
-                return string.Compare(GetFileName(fullRawEntry), target.ReadUnicodeString(0, target.Length), StringComparison.InvariantCultureIgnoreCase);
+                Console.WriteLine($"Comparing... {target.ReadUnicodeString(0, target.Length)} to {GetFileName(fullRawEntry)}");
+                return string.Compare(target.ReadUnicodeString(0, target.Length), GetFileName(fullRawEntry), StringComparison.InvariantCultureIgnoreCase);
 
             case CollationRules.CollationUnicodeString:
-                return string.Compare(DecodeUtf16(key), key.ReadUnicodeString(0, key.Length), StringComparison.InvariantCulture);
+                return string.Compare(target.ReadUnicodeString(0, target.Length), DecodeUtf16(key), StringComparison.InvariantCulture);
 
             case CollationRules.CollationNtofsUlong:
                 return key.ReadUInt32(0).CompareTo(target.ReadUInt32(0));
