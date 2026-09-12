@@ -4,8 +4,10 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Nternal.Attributes;
 using Nternal.Helpers;
+using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
 using Nternal.Ntfs.Index;
+using Nternal.Ntfs.NtfsExtensions.Journal;
 using Nternal.Structs;
 
 namespace Nternal
@@ -29,10 +31,14 @@ namespace Nternal
             CollationHandler = new();
             ParseBootSector();
             ParseMft();
-            
-            RootFolder = GetNtfsFile(new FileReference(5, 0), false);
+
+            VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Volume);
+            RootFolder = GetKnownNtfsFile(KnownMftRecord.Root);
             SetupUpcaseTable();
         }
+
+        public UsnJournalReader GetJournalReader() =>
+            new UsnJournalReader(GetNtfsFile("/$Extend/$UsnJrnl"), BootSector.BytesPerCluster);
 
         private void ParseBootSector()
         {
@@ -47,7 +53,7 @@ namespace Nternal
         {
             const int Utf16CharCount = 65536, Utf16ByteCount = Utf16CharCount * 2;
             
-            UpcaseFile = GetNtfsFile(new FileReference(10, 0), false);
+            UpcaseFile = GetKnownNtfsFile(KnownMftRecord.UpCase);
             var stream = UpcaseFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
 
             if (stream.Length != Utf16CharCount * sizeof(char))
@@ -64,7 +70,8 @@ namespace Nternal
         private bool _hasParsedMftYet = false;
         private IDataStream? _mftStream = null;
         
-        public NtfsFile? Mft { get; private set; }
+        public NtfsFile? MftFile { get; private set; }
+        public NtfsFile? VolumeBitmapFile { get; private set; }
         public NtfsFile? RootFolder  { get; private set; }
         public NtfsFile? UpcaseFile { get; private set; }
     }

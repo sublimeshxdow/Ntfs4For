@@ -1,11 +1,15 @@
-﻿using System.Security.AccessControl;
+﻿using System.Runtime.CompilerServices;
+using System.Security.AccessControl;
 using System.Text;
 using Nternal;
 using Nternal.Attributes;
 using Nternal.Core;
 using Nternal.Helpers;
+using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
 using Nternal.Ntfs.Index;
+using Nternal.Ntfs.NtfsExtensions;
+using Nternal.Ntfs.NtfsExtensions.Journal;
 using Nternal.Ntfs.Security;
 using Nternal.Partitioning.Gpt;
 using Nternal.Partitioning.Mbr;
@@ -21,17 +25,13 @@ internal class Program
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var entry = v.GetNtfsFile($"/$MfT");
-        entry = v.GetNtfsFile($"/$MfT");
-        var attr = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
+        var jrnl = v.GetJournalReader();
 
-        using FileStream fs = new("$MFT_NEW", FileMode.Create);
-        Span<byte> buffer = new byte[4096];
+        Console.WriteLine(jrnl.GetJournalEntries().Count());
+        Console.WriteLine(jrnl.GetJournalEntries().Count());
+        Console.WriteLine(jrnl.GetJournalEntries().Count());
+        Console.WriteLine(jrnl.GetJournalEntries().Count());
         
-        for (long offset = 0; offset < attr.GetStream().AllocatedLength - 4096; offset += 4096)
-        {
-            attr.GetStream().ReadExactly(offset, buffer); 
-            fs.Write(buffer);
-        }
+        return;
     }
 }

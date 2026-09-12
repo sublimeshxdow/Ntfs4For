@@ -39,7 +39,7 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file, bool isMft)
                 break;
 
             RawAttributeHeader header = MemoryMarshal.Cast<byte, RawAttributeHeader>(attributeBuffer)[0];
-            string name = Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength));
+            string name = Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength * 2));
 
             if (entry.AttributeId != header.AttributeId
                 || entry.Type != header.Type

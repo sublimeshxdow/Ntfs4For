@@ -141,7 +141,7 @@ namespace Nternal.Attributes
             var data = attributeList.Cast<AttributeListAttribute>();
             data.ParseFromAccessor( true);
 
-            FileRecordMerger merger = new(_ntfsVolume, this, _ntfsVolume.Mft == null);
+            FileRecordMerger merger = new(_ntfsVolume, this, _ntfsVolume.MftFile == null);
             foreach (var entry in data.Entries)
                 merger.MergeListedEntry(entry);
         }

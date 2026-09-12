@@ -32,7 +32,7 @@ namespace Nternal.Attributes
                 long lowestLcn = buffer.ReadInt64(8);
                 FileReference baseFileReference = new FileReference(buffer.ReadUInt64(16));
                 ushort attributeId = buffer.ReadUInt16(24);
-                string name = buffer.ReadUnicodeString(nameOffset, nameLength);
+                string name = buffer.ReadUnicodeString(nameOffset, nameLength * 2);
                 
                 Entries.Add(new Entry()
                 {

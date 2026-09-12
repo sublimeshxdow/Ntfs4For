@@ -12,7 +12,7 @@ public partial class NonResidentDataStream
 
         foreach (var extent in Extents)
         {
-            long extentEndExclusive = extent.HighestVcn + 1; // HighestVcn is INCLUSIVE
+            long extentEndExclusive = extent.HighestVcn + 1;
 
             if (extentEndExclusive > lowVcn && extent.LowestVcn < highVcn)
             {
@@ -20,12 +20,11 @@ public partial class NonResidentDataStream
                 long overlapEnd = Math.Min(extentEndExclusive, highVcn);
                 long overlapClusters = overlapEnd - overlapStart;
 
-                long extentRelativeStart = overlapStart - extent.LowestVcn;
                 long bufferByteOffset = (overlapStart - lowVcn) * _bytesPerCluster;
                 int byteLength = (int)(overlapClusters * _bytesPerCluster);
 
                 Span<byte> subBuffer = buffer.Slice((int)bufferByteOffset, byteLength);
-                ReadFromExtend(extent, subBuffer, extentRelativeStart, (int)overlapClusters);
+                ReadFromExtend(extent, subBuffer, overlapStart, (int)overlapClusters);
 
                 clustersCovered += overlapClusters;
             }

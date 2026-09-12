@@ -18,7 +18,7 @@ namespace Nternal
         {
             if (_hasParsedMftYet)
             {
-                var bitmapAttr = Mft.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, "");
+                var bitmapAttr = MftFile.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, "");
                 if (bitmapAttr == null)
                     throw new InvalidOperationException(
                         $"$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
@@ -27,7 +27,7 @@ namespace Nternal
                     throw new Exception($"Attempted to parse an unused $Mft-Record!");
             }
 
-            var mftStream = mft ?? Mft.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
+            var mftStream = mft ?? MftFile.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
             if (mftStream == null)
                 throw new InvalidOperationException(
                     $"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
@@ -60,7 +60,7 @@ namespace Nternal
         public void ParseMft(bool paranoid = true, bool fixup = true, bool postXp = true)
         {
             var raw = GetMftRecord(paranoid, fixup);
-            Mft = new NtfsFile(raw, _provider, this, postXp);
+            MftFile = new NtfsFile(raw, _provider, this, postXp);
             _hasParsedMftYet = true;
         }
 

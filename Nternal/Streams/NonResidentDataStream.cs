@@ -33,6 +33,7 @@ namespace Nternal.Streams
         public long Length => Extents.First().RealSize!.Value;
         public long AllocatedLength => Extents.First().AllocatedSize!.Value;
         public int Alignment => _bytesPerCluster;
+        public int GetBytesPerCluster() => _bytesPerCluster;
 
         public List<Extent> Extents { get; } = [];
 
@@ -46,7 +47,7 @@ namespace Nternal.Streams
         {
             if (position % Alignment != 0 && buffer.Length % Alignment != 0)
                 throw new ArgumentException("Both position & buffer-size must be aligned to the cluster size!");
-            
+
             ReadIntoBuffer(buffer, position / _bytesPerCluster, buffer.Length / _bytesPerCluster);
             return buffer.Length;
         }
@@ -55,6 +56,22 @@ namespace Nternal.Streams
         {
             if (Read(position, buffer) != buffer.Length)
                 throw new EndOfStreamException();
+        }
+
+        public long? GetFirstNonSparseVcn()
+        {
+            long vcn = 0;
+
+            foreach (var extent in Extents)
+            {
+                foreach (var run in extent.DataRuns)
+                    if (run.Sparse)
+                        vcn += run.Length;
+                    else
+                        return vcn;
+            }
+            
+            return null;
         }
 
         public bool TryGetMemory(out Span<byte> memory)
@@ -68,6 +85,8 @@ namespace Nternal.Streams
             Extents.Add(extent);
         }
 
-        public void Dispose() { }
+        public void Dispose()
+        {
+        }
     }
 }
