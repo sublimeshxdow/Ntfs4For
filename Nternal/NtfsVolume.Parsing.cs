@@ -4,6 +4,7 @@ using System.Text;
 using Nternal.Attributes;
 using Nternal.Core.Streams;
 using Nternal.Helpers;
+using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
 using Nternal.Ntfs.Index;
 using Nternal.Structs;
@@ -63,12 +64,18 @@ namespace Nternal
             _hasParsedMftYet = true;
         }
 
+        public NtfsFile GetKnownNtfsFile(KnownMftRecord record)
+        {
+            var fileReference = new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
+            return GetNtfsFile(fileReference, true);
+        }
+
         public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
         {
             var rawRecord = GetRawRecordData(reference, true, compareSequence, true);
             return new NtfsFile(rawRecord, _provider, this, true);
         }
-
+        
         public NtfsFile GetNtfsFile(string path)
         {
             if (RootFolder == null)

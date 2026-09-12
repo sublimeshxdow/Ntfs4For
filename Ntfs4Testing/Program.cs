@@ -21,10 +21,17 @@ internal class Program
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var entry = v.GetNtfsFile($"/$AttrDef");
+        var entry = v.GetNtfsFile($"/$MfT");
+        entry = v.GetNtfsFile($"/$MfT");
         var attr = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
-        Span<byte> buffer = new byte[attr.GetStream().Length];
-        attr.GetStream().ReadExactly(0, buffer);
-        File.WriteAllBytes("$Attrdef", buffer.Slice(0, (int)attr.GetStream().Length));
+
+        using FileStream fs = new("$MFT_NEW", FileMode.Create);
+        Span<byte> buffer = new byte[4096];
+        
+        for (long offset = 0; offset < attr.GetStream().AllocatedLength - 4096; offset += 4096)
+        {
+            attr.GetStream().ReadExactly(offset, buffer); 
+            fs.Write(buffer);
+        }
     }
 }
