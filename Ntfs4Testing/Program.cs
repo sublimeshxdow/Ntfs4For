@@ -20,12 +20,15 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
+        //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
+        var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
 
         var jrnl = v.GetJournalReader();
+
+        var entry = v.GetNtfsFile("/Users/lukas/test/cygwin64/var/log/setup.log");
 
         Console.WriteLine(jrnl.GetJournalEntries().Count());
         Console.WriteLine(jrnl.GetJournalEntries().Count());

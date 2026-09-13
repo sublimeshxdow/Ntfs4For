@@ -79,81 +79,77 @@ namespace Nternal
         public NtfsFile GetNtfsFile(string path)
         {
             if (RootFolder == null)
-                throw new InvalidOperationException(
-                    $"Cannot parse arbitrary NTFS files before initialization completed!");
+                throw new InvalidOperationException("Cannot parse arbitrary NTFS files before initialization completed!");
 
-            path = path.Trim('/');
-            string[] parts = path.Split('/');
-            List<FileReference> references = new(path.Split('/').Length)
-            {
-                RootFolder.GetReference()
-            };
-
+            var components = new LinkedList<string>(path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries));
+            var references = new Stack<FileReference>();
+            references.Push(RootFolder.GetReference());
             NtfsFile file = RootFolder;
-            string currentPath = "/";
 
-            foreach (string entry in path.Split('/'))
+            int symlinkHops = 0;
+
+            // https://learn.microsoft.com/de-de/windows/win32/fileio/symbolic-link-programming-considerations
+            const int MaxSymlinkHops = 63;
+
+            while (components.Count > 0)
             {
-                // Check for symlinks
-                var reparse = file.NtfsAttributes
-                    .FirstOrDefault(x => x.Type == NtfsAttributeType.Reparse);
+                string entry = components.First!.Value;
+                components.RemoveFirst();
 
+                if (entry is "" or ".")
+                    continue;
+
+                if (entry == "..")
+                {
+                    if (references.Count <= 1)
+                        throw new ArgumentException("Cannot do \"..\" when already at the root!");
+
+                    references.Pop();
+                    file = GetNtfsFile(references.Peek(), true);
+                    continue;
+                }
+
+                if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
+                    throw new InvalidOperationException($"\"{entry}\" cannot be looked up inside a non-directory!");
+
+                IndexParser parser = CreateIndexParser(file, "$I30");
+                var indexEntry = parser.TryFindRootEntry(Encoding.Unicode.GetBytes(entry));
+                if (indexEntry == null)
+                    throw new FileNotFoundException($"Failed to find file/folder \"{entry}\"!");
+
+                var reference = indexEntry.GetI30MftReference()!.Value;
+                var resolved = GetNtfsFile(reference, true);
+
+                // Check the entry we just found, not the 'file' from before descending.
+                var reparse = resolved.NtfsAttributes.FirstOrDefault(x => x.Type == NtfsAttributeType.Reparse);
                 if (reparse != null)
                 {
                     var reparseData = reparse.Cast<ReparseAttribute>(true);
                     if (reparseData.TypeAndFlags.HasFlag(ReparseTypeAndFlags.SymbolicLink))
                     {
-                        var symlinkData = reparseData.Data as SymbolicLinkReparseData;
-                        if (symlinkData == null)
-                            throw new InvalidOperationException(
-                                $"File at {path} has $Reparse-Attribute of type SymbolicLink, but it's data is of another type!");
+                        if (++symlinkHops > MaxSymlinkHops)
+                            throw new InvalidOperationException("Too many symbolic link redirections -- possible loop.");
 
-                        string substitutePath = symlinkData.SubstituteName;
+                        var symlinkData = reparseData.Data as SymbolicLinkReparseData
+                            ?? throw new InvalidOperationException($"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
+
                         if (!symlinkData.Flags.HasFlag(SymbolicLinkReparseData.SymlinkFlags.IsRelative))
                             throw new NotSupportedException(
-                                $"At the moment, only relative symbolic links are supported!\n" +
-                                $"This path would resolve to \"{Path.Combine(substitutePath, path.Replace(currentPath, ""))}\".");
+                                $"Only relative symbolic links are currently supported (\"{entry}\" is absolute).");
 
-                        if (substitutePath.StartsWith('\\'))
-                        {
-                            substitutePath = substitutePath.Replace('\\', '/');
-                            return GetNtfsFile(substitutePath);
-                        }
+                        var targetParts = symlinkData.SubstituteName.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+                        for (int i = targetParts.Length - 1; i >= 0; i--)
+                            components.AddFirst(targetParts[i]);
 
-                        string[] reparsePathParts = substitutePath.Split('\\');
-                        foreach (var reparsePath in reparsePathParts)
-                        {
-                            if (reparsePath == "..")
-                            {
-                                int nextLowerPath = reparsePath.LastIndexOf('/');
-                                if (nextLowerPath == -1)
-                                    throw new FileNotFoundException(
-                                        $"The given file cannot exist, as it's relative symbolic link resolves to a path that cannot exis!");
-
-                                currentPath = currentPath[..(nextLowerPath - 1)];
-                            }
-
-                            else
-                                return GetNtfsFile(currentPath);
-                        }
+                        continue;
                     }
                 }
 
-                if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
-                    throw new InvalidOperationException($"\"{currentPath}\" does not represent a directory!");
-
-                IndexParser parser = CreateIndexParser(file, "$I30");
-                var indexEntry = parser.TryFindRootEntry(Encoding.Unicode.GetBytes(entry));
-                if (indexEntry == null)
-                    throw new FileNotFoundException($"Failed to find file/folder \"{entry}\" at \"{currentPath}\"!");
-
-                var reference = indexEntry.GetI30MftReference()!.Value;
                 if (references.Contains(reference))
-                    throw new InvalidOperationException($"Detected circular folder structure - will not continue!");
+                    throw new InvalidOperationException($"Detected circular folder structure involving \"{entry}\"!");
 
-                references.Add(reference);
-                file = GetNtfsFile(reference, true);
-                currentPath += $"/{entry}";
+                references.Push(reference);
+                file = resolved;
             }
 
             return file;
