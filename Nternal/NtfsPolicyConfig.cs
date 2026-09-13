@@ -10,4 +10,7 @@ public class NtfsPolicyConfig
     }
 
     public static Flags PolicyFlags { get; set; } = Flags.ParanoidParsing;
+
+    // Default Limit for Windows - https://learn.microsoft.com/de-de/windows/win32/fileio/symbolic-link-programming-considerations
+    public static int HopLimit { get; set; } = 63;
 }

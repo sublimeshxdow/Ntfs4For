@@ -88,9 +88,6 @@ namespace Nternal
 
             int symlinkHops = 0;
 
-            // https://learn.microsoft.com/de-de/windows/win32/fileio/symbolic-link-programming-considerations
-            const int MaxSymlinkHops = 63;
-
             while (components.Count > 0)
             {
                 string entry = components.First!.Value;
