@@ -59,10 +59,10 @@ namespace Nternal.Attributes
 
     }
 
-    public class ReparseAttribute(NtfsAttribute underlying) : IParsableAttribute
+    public class ReparseAttribute: IParsableAttribute
     {
         public NtfsAttribute Underlying { get; init; } = null!;
-
+        
         public void ParseFromAccessor(bool paranoid)
         {
             Span<byte> buffer = new byte[Underlying.Accessor.AllocatedLength];

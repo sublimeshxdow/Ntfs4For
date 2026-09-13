@@ -75,26 +75,84 @@ namespace Nternal
             var rawRecord = GetRawRecordData(reference, true, compareSequence, true);
             return new NtfsFile(rawRecord, _provider, this, true);
         }
-        
+
         public NtfsFile GetNtfsFile(string path)
         {
             if (RootFolder == null)
                 throw new InvalidOperationException(
-                    $"Cannot parse arbitrary ntfs file before initialization completed!");
+                    $"Cannot parse arbitrary NTFS files before initialization completed!");
 
             path = path.Trim('/');
+            string[] parts = path.Split('/');
+            List<FileReference> references = new(path.Split('/').Length)
+            {
+                RootFolder.GetReference()
+            };
+
             NtfsFile file = RootFolder;
             string currentPath = "/";
 
             foreach (string entry in path.Split('/'))
             {
+                // Check for symlinks
+                var reparse = file.NtfsAttributes
+                    .FirstOrDefault(x => x.Type == NtfsAttributeType.Reparse);
+
+                if (reparse != null)
+                {
+                    var reparseData = reparse.Cast<ReparseAttribute>(true);
+                    if (reparseData.TypeAndFlags.HasFlag(ReparseTypeAndFlags.SymbolicLink))
+                    {
+                        var symlinkData = reparseData.Data as SymbolicLinkReparseData;
+                        if (symlinkData == null)
+                            throw new InvalidOperationException(
+                                $"File at {path} has $Reparse-Attribute of type SymbolicLink, but it's data is of another type!");
+
+                        string substitutePath = symlinkData.SubstituteName;
+                        if (!symlinkData.Flags.HasFlag(SymbolicLinkReparseData.SymlinkFlags.IsRelative))
+                            throw new NotSupportedException(
+                                $"At the moment, only relative symbolic links are supported!\n" +
+                                $"This path would resolve to \"{Path.Combine(substitutePath, path.Replace(currentPath, ""))}\".");
+
+                        if (substitutePath.StartsWith('\\'))
+                        {
+                            substitutePath = substitutePath.Replace('\\', '/');
+                            return GetNtfsFile(substitutePath);
+                        }
+
+                        string[] reparsePathParts = substitutePath.Split('\\');
+                        foreach (var reparsePath in reparsePathParts)
+                        {
+                            if (reparsePath == "..")
+                            {
+                                int nextLowerPath = reparsePath.LastIndexOf('/');
+                                if (nextLowerPath == -1)
+                                    throw new FileNotFoundException(
+                                        $"The given file cannot exist, as it's relative symbolic link resolves to a path that cannot exis!");
+
+                                currentPath = currentPath[..(nextLowerPath - 1)];
+                            }
+
+                            else
+                                return GetNtfsFile(currentPath);
+                        }
+                    }
+                }
+
+                if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
+                    throw new InvalidOperationException($"\"{currentPath}\" does not represent a directory!");
+
                 IndexParser parser = CreateIndexParser(file, "$I30");
                 var indexEntry = parser.TryFindRootEntry(Encoding.Unicode.GetBytes(entry));
-
                 if (indexEntry == null)
                     throw new FileNotFoundException($"Failed to find file/folder \"{entry}\" at \"{currentPath}\"!");
 
-                file = GetNtfsFile(indexEntry.GetI30MftReference()!.Value, true);
+                var reference = indexEntry.GetI30MftReference()!.Value;
+                if (references.Contains(reference))
+                    throw new InvalidOperationException($"Detected circular folder structure - will not continue!");
+
+                references.Add(reference);
+                file = GetNtfsFile(reference, true);
                 currentPath += $"/{entry}";
             }
 
