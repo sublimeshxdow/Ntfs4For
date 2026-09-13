@@ -124,7 +124,7 @@ namespace Nternal
                     var reparseData = reparse.Cast<ReparseAttribute>(true);
                     if (reparseData.TypeAndFlags.HasFlag(ReparseTypeAndFlags.SymbolicLink))
                     {
-                        if (++symlinkHops > MaxSymlinkHops)
+                        if (++symlinkHops > NtfsPolicyConfig.HopLimit)
                             throw new InvalidOperationException("Too many symbolic link redirections -- possible loop.");
 
                         var symlinkData = reparseData.Data as SymbolicLinkReparseData
