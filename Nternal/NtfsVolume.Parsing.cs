@@ -166,7 +166,7 @@ namespace Nternal
             return new RawFileRecord(mftRecord);
         }
 
-        private IndexParser CreateIndexParser(NtfsFile file, string index) =>
+        public IndexParser CreateIndexParser(NtfsFile file, string index) =>
             new IndexParser(file, index, CollationHandler, FixupHelper);
     }
 }

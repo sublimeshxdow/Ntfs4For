@@ -1,0 +1,124 @@
+using System.Numerics;
+using Nternal.Extensions;
+
+namespace Nternal.Ntfs.Compression;
+
+public class NtfsDecompressor
+{
+    public static Span<byte> DecompressChunk(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        if (source.Length < 2)
+            throw new InvalidDataException(
+                $"LZNT1 chunk requires at least 2 bytes for the header, got {source.Length}.");
+
+        ushort header = source.ReadUInt16(0);
+        // zero-header => stop
+        if (header == 0)
+            return Span<byte>.Empty;
+
+        if (((header >> 12) & 0x07) != 0x03)
+            throw new InvalidDataException(
+                $"Invalid compression header signature (expected 011, got {(header >> 12) & 0x07:X}).");
+
+        bool compressed = (header & 0x8000) != 0;
+        ushort payloadLength = (ushort)((header & 0xFFF) + 1);
+        int length = 0;
+
+        if (source.Length < 2 + payloadLength)
+            throw new InvalidDataException(
+                $"LZNT1 chunk declares a payload of {payloadLength} bytes, but only {source.Length - 2} are available.");
+
+        if (!compressed)
+        {
+            if (destination.Length < payloadLength)
+                throw new InvalidDataException(
+                    $"Destination buffer ({destination.Length} bytes) is too small for the uncompressed payload ({payloadLength} bytes).");
+
+            source.Slice(2, payloadLength).CopyTo(destination);
+            return destination[..payloadLength];
+        }
+
+        DecompressChunkInternal(source.Slice(2, payloadLength), destination, ref length);
+        return destination[..length];
+    }
+
+    private static void DecompressChunkInternal(ReadOnlySpan<byte> compressed, Span<byte> destination, ref int length)
+    {
+        int inputPosition = 0, outputPosition = 0;
+
+        while (true)
+        {
+            if (inputPosition >= compressed.Length)
+            {
+                length = outputPosition;
+                return;
+            }
+
+            byte flag = compressed[inputPosition++];
+            for (int b = 0; b < 8; b++)
+            {
+                // Check whether we are done
+                if (inputPosition >= compressed.Length)
+                {
+                    length = outputPosition;
+                    return;
+                }
+
+                bool isLiteral = (flag & (1 << b)) == 0;
+
+                // Simple literal => copy
+                if (isLiteral)
+                {
+                    if (outputPosition >= destination.Length)
+                        throw new InvalidDataException(
+                            $"LZNT1 chunk decompresses beyond the destination buffer ({destination.Length} bytes) while writing a literal.");
+
+                    byte literal = compressed[inputPosition++];
+                    destination[outputPosition++] = literal;
+                }
+
+                // Back-reference
+                else
+                {
+                    if (inputPosition + 2 > compressed.Length)
+                        throw new InvalidDataException(
+                            "LZNT1 chunk ends mid-way through a back-reference symbol (need 2 bytes).");
+
+                    ushort reference = compressed.ReadUInt16(inputPosition);
+                    inputPosition += 2;
+
+                    int exp = 4;
+                    if (outputPosition > 16)
+                    {
+                        int bitLength = BitOperations.Log2((uint)(outputPosition - 1)) + 1;
+                        exp = Math.Min(bitLength, 12);
+                    }
+
+                    int lengthBits = 16 - exp, mask = (1 << lengthBits) - 1;
+                    int extractOffset = (reference >> lengthBits) + 1, extractLength = (reference & mask) + 3;
+                    int absExtractOffset = outputPosition - extractOffset;
+
+                    if (absExtractOffset < 0)
+                        throw new InvalidDataException(
+                            $"LZNT1 back-reference offset {extractOffset} reads before the start of the output " +
+                            $"(current position {outputPosition}).");
+
+                    if (outputPosition + extractLength > destination.Length)
+                        throw new InvalidDataException(
+                            $"LZNT1 back-reference would write {outputPosition + extractLength} bytes, " +
+                            "exceeding the destination buffer ({destination.Length} bytes).");
+
+                    // Copy
+                    int remaining = extractLength;
+                    while (remaining > 0)
+                    {
+                        int toCopy = Math.Min(remaining, extractOffset);
+                        destination.Slice(absExtractOffset, toCopy).CopyTo(destination.Slice(outputPosition));
+                        outputPosition += toCopy;
+                        remaining -= toCopy;
+                    }
+                }
+            }
+        }
+    }
+}

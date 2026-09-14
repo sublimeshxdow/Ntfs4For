@@ -7,6 +7,7 @@ using Nternal.Core;
 using Nternal.Helpers;
 using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
+using Nternal.Ntfs.Compression;
 using Nternal.Ntfs.Index;
 using Nternal.Ntfs.NtfsExtensions;
 using Nternal.Ntfs.NtfsExtensions.Journal;
@@ -20,21 +21,29 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
-        var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
+        byte[] Lznt1Example =
+        {
+            0x18, 0xB0, 0x00, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+            0x00, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50,
+            0x0A, 0x51, 0x02, 0x80, 0x21, 0x04, 0x10,
+            0x00, 0x00
+        };
+        Span<byte> output = stackalloc byte[1024];
+        var r = NtfsDecompressor.DecompressChunk(Lznt1Example, output);
+        Console.WriteLine(Encoding.UTF8.GetString(r));
+        return;
+
+        //var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
+        var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var jrnl = v.GetJournalReader();
+        var entry = v.GetNtfsFile("/$Secure");
+        var index = v.CreateIndexParser(entry, "$SII");
 
-        var entry = v.GetNtfsFile("/Users/lukas/test/cygwin64/var/log/setup.log");
+        var secureEntry = index.TryFindRootEntry(BitConverter.GetBytes((uint)256));
 
-        Console.WriteLine(jrnl.GetJournalEntries().Count());
-        Console.WriteLine(jrnl.GetJournalEntries().Count());
-        Console.WriteLine(jrnl.GetJournalEntries().Count());
-        Console.WriteLine(jrnl.GetJournalEntries().Count());
-        
         return;
     }
 }
