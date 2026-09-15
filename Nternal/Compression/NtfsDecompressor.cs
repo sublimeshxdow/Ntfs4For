@@ -5,13 +5,29 @@ namespace Nternal.Ntfs.Compression;
 
 public class NtfsDecompressor
 {
-    public static Span<byte> DecompressChunk(ReadOnlySpan<byte> source, Span<byte> destination)
+    public static Span<byte> DecompressUnit(ReadOnlySpan<byte> source, Span<byte> destination)
+    {
+        int read = 0, written = 0;
+        while (source.ReadUInt16(read) != 0)
+        {
+            int lastRead = 0, lastWritten = 0;
+            DecompressChunk(source[read..], destination[written..], ref lastRead, ref lastWritten);
+            read += lastRead;
+            written += lastWritten;
+        }
+
+        return destination;
+    }
+
+    private static Span<byte> DecompressChunk(ReadOnlySpan<byte> source, Span<byte> destination,
+        ref int sourceBytesProcessed, ref int outputBytesWritten)
     {
         if (source.Length < 2)
             throw new InvalidDataException(
                 $"LZNT1 chunk requires at least 2 bytes for the header, got {source.Length}.");
 
         ushort header = source.ReadUInt16(0);
+
         // zero-header => stop
         if (header == 0)
             return Span<byte>.Empty;
@@ -22,7 +38,7 @@ public class NtfsDecompressor
 
         bool compressed = (header & 0x8000) != 0;
         ushort payloadLength = (ushort)((header & 0xFFF) + 1);
-        int length = 0;
+        sourceBytesProcessed = 2 + payloadLength;
 
         if (source.Length < 2 + payloadLength)
             throw new InvalidDataException(
@@ -38,11 +54,11 @@ public class NtfsDecompressor
             return destination[..payloadLength];
         }
 
-        DecompressChunkInternal(source.Slice(2, payloadLength), destination, ref length);
-        return destination[..length];
+        DecompressChunkInternal(source.Slice(2, payloadLength), destination, ref outputBytesWritten);
+        return destination[..outputBytesWritten];
     }
 
-    private static void DecompressChunkInternal(ReadOnlySpan<byte> compressed, Span<byte> destination, ref int length)
+    private static void DecompressChunkInternal(ReadOnlySpan<byte> compressed, Span<byte> destination, ref int written)
     {
         int inputPosition = 0, outputPosition = 0;
 
@@ -50,7 +66,7 @@ public class NtfsDecompressor
         {
             if (inputPosition >= compressed.Length)
             {
-                length = outputPosition;
+                written = outputPosition;
                 return;
             }
 
@@ -60,7 +76,7 @@ public class NtfsDecompressor
                 // Check whether we are done
                 if (inputPosition >= compressed.Length)
                 {
-                    length = outputPosition;
+                    written = outputPosition;
                     return;
                 }
 
