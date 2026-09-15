@@ -32,7 +32,7 @@ namespace Nternal.Attributes
             Span<byte> data = new byte[Underlying.Accessor.AllocatedLength];
             Underlying.Accessor.Read(0, data);
 
-            while (true)
+            while (data.Length > 0)
             {
                 int offsetToNextEa = (int)data.ReadUInt32(0);
                 EaFlag flags = (EaFlag)data[4];
@@ -46,9 +46,6 @@ namespace Nternal.Attributes
                     Value = data[valueOffset..(valueOffset + valueLength)].ToArray(),
                     Flags = flags,
                 });
-
-                if (offsetToNextEa == 0)
-                    break;
 
                 data = data.Slice(offsetToNextEa);
             }

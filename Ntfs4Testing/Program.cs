@@ -21,11 +21,13 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        //var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
-        var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
+        var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
+        //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
+
+        var file = v.GetNtfsFile(new FileReference(0x1E917, 0xff), false);
 
         var entry = v.GetNtfsFile("Users/xxluk/Desktop/compression/65536_Zeros_Compressed");
         var data = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
