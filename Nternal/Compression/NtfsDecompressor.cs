@@ -8,7 +8,7 @@ public class NtfsDecompressor
     public static Span<byte> DecompressUnit(ReadOnlySpan<byte> source, Span<byte> destination)
     {
         int read = 0, written = 0;
-        while (source.ReadUInt16(read) != 0)
+        while (source.Length - read >= 2 && source.ReadUInt16(read) != 0)
         {
             int lastRead = 0, lastWritten = 0;
             DecompressChunk(source[read..], destination[written..], ref lastRead, ref lastWritten);
@@ -51,6 +51,7 @@ public class NtfsDecompressor
                     $"Destination buffer ({destination.Length} bytes) is too small for the uncompressed payload ({payloadLength} bytes).");
 
             source.Slice(2, payloadLength).CopyTo(destination);
+            outputBytesWritten = payloadLength;
             return destination[..payloadLength];
         }
 
@@ -122,7 +123,7 @@ public class NtfsDecompressor
                     if (outputPosition + extractLength > destination.Length)
                         throw new InvalidDataException(
                             $"LZNT1 back-reference would write {outputPosition + extractLength} bytes, " +
-                            "exceeding the destination buffer ({destination.Length} bytes).");
+                            $"exceeding the destination buffer ({destination.Length} bytes).");
 
                     // Copy
                     int remaining = extractLength;

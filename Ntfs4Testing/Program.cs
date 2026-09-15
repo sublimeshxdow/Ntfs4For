@@ -27,8 +27,6 @@ internal class Program
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var file = v.GetNtfsFile(new FileReference(0x1E917, 0xff), false);
-
         var entry = v.GetNtfsFile("Users/xxluk/Desktop/compression/65536_Zeros_Compressed");
         var data = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
         var dataStream = (NonResidentDataStream)data.GetStream();
