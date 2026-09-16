@@ -45,7 +45,7 @@ namespace Nternal.Streams
 
         public int Read(long position, Span<byte> buffer)
         {
-            if (position % Alignment != 0 && buffer.Length % Alignment != 0)
+            if (position % Alignment != 0 || buffer.Length % Alignment != 0)
                 throw new ArgumentException("Both position & buffer-size must be aligned to the cluster size!");
 
             ReadIntoBuffer(buffer, position / _bytesPerCluster, buffer.Length / _bytesPerCluster);
@@ -72,6 +72,39 @@ namespace Nternal.Streams
             }
             
             return null;
+        }
+
+        private int _resumeExtentIndex = 0;
+        private int _resumeRunIndex = 0;
+        private long _resumeVcn = 0;
+
+        public bool IsSparseVcn(long vcn)
+        {
+            if (vcn < _resumeVcn)
+            {
+                // Caller went backwards
+                _resumeExtentIndex = _resumeRunIndex = 0;
+                _resumeVcn = 0;
+            }
+
+            for (int e = _resumeExtentIndex; e < Extents.Count; e++)
+            {
+                var runs = Extents[e].DataRuns;
+                for (int r = (e == _resumeExtentIndex ? _resumeRunIndex : 0); r < runs.Count; r++)
+                {
+                    var run = runs[r];
+                    if (vcn >= _resumeVcn && vcn < _resumeVcn + run.Length)
+                    {
+                        _resumeExtentIndex = e;
+                        _resumeRunIndex = r;
+                        return run.Sparse;
+                    }
+                    _resumeVcn += run.Length;
+                }
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(vcn),
+                $"Attempted to retrieve VCN {vcn}, but this stream only contains {_resumeVcn} clusters!");
         }
 
         public bool TryGetMemory(out Span<byte> memory)
