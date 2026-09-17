@@ -8,7 +8,9 @@ public class NtfsPolicyConfig
         ParanoidParsing = 0x00000001,
         ParanoidParsingUrnJrnl = 0x00000002
     }
-
+    
+    public static bool ListPosixFileNames { get; set; } = true;
+    
     public static Flags PolicyFlags { get; set; } = Flags.ParanoidParsing;
 
     // Default Limit for Windows - https://learn.microsoft.com/de-de/windows/win32/fileio/symbolic-link-programming-considerations

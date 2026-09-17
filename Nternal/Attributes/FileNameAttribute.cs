@@ -7,7 +7,6 @@ using Nternal.Ntfs.Attributes;
 
 namespace Nternal.Attributes
 {
-    [Flags]
     public enum FileNameNamespace : byte
     {
         Posix = 0,

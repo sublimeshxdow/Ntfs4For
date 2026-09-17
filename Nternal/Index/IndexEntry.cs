@@ -7,6 +7,7 @@ namespace Nternal.Ntfs.Index;
 
 public class IndexEntry : IComparable<IndexEntry>
 {
+    [Flags]
     public enum IndexFlags : ushort
     {
         HasSubnode = 0x0001,

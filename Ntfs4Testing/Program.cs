@@ -22,31 +22,45 @@ internal class Program
 {
     private static void Main(string[] args)
     {
+        Stopwatch sysTime = new();
+        List<string> sysFiles = new();
+        sysTime.Start();
+        for (int i = 0; i < 100; i++)
+        {
+            foreach (string file in Directory.EnumerateFileSystemEntries("/mnt/Windows/WinSxS/").ToList())
+                sysFiles.Add(file);
+        }
+
+        sysTime.Stop();
+        Console.WriteLine(sysTime.Elapsed.TotalMilliseconds / 100);
+        
         // var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
         var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var entry = v.GetNtfsFile("Users/xxluk/Desktop/EXCEL.EXE");
+        var entry = v.GetNtfsFile("Windows/WinSxS/");
+        var index = v.CreateIndexParser(entry, "$I30");
 
-        var excelStream = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
-        var compressedStream = new CompressedDataStream((NonResidentDataStream)excelStream!.GetStream());
+        List<string> parsedNames = new();
+        Console.WriteLine();
 
-        Stopwatch s = new();
-        Span<byte> data = new byte[excelStream.Underlying.Accessor.AllocatedLength];
-
-        for (int i = 0; i < 10; i++)
+        Stopwatch myTime = new();
+        List<string> myFiles = new();
+        myTime.Start();
+        for (int a = 0; a < 100; a++)
         {
-            s.Restart();
-            compressedStream.LoadIntoMemory();
-
-            byte[] buffer = new byte[compressedStream.Length];
-            compressedStream.Read(0, buffer);
-
-            File.WriteAllBytes($"EXCEL_{i}.exe", buffer);
-            s.Stop();
-            Console.WriteLine(s.ElapsedMilliseconds);
+            foreach (var i in index.EnumerateEntries())
+            {
+                var f = new FileNameData();
+                f.Parse(i.GetKey(), true);
+                myFiles.Add(f.Name);
+            }
         }
+        myTime.Stop();
+        Console.WriteLine(myTime.Elapsed.TotalMilliseconds / 100);
+        Console.WriteLine("---");
+        Console.WriteLine($"{sysFiles.Count}/{myFiles.Count}");
     }
 }
