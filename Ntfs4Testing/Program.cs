@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Security.AccessControl;
 using System.Text;
 using Nternal;
@@ -27,12 +28,25 @@ internal class Program
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var entry = v.GetNtfsFile("Users/lstue/Desktop/EXCEL.EXE");
+        var entry = v.GetNtfsFile("Users/xxluk/Desktop/EXCEL.EXE");
 
         var excelStream = entry.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
         var compressedStream = new CompressedDataStream((NonResidentDataStream)excelStream!.GetStream());
 
+        Stopwatch s = new();
         Span<byte> data = new byte[excelStream.Underlying.Accessor.AllocatedLength];
-        compressedStream.Read(0, data);
+
+        for (int i = 0; i < 10; i++)
+        {
+            s.Restart();
+            compressedStream.LoadIntoMemory();
+
+            byte[] buffer = new byte[compressedStream.Length];
+            compressedStream.Read(0, buffer);
+
+            File.WriteAllBytes($"EXCEL_{i}.exe", buffer);
+            s.Stop();
+            Console.WriteLine(s.ElapsedMilliseconds);
+        }
     }
 }

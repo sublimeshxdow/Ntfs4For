@@ -70,41 +70,47 @@ namespace Nternal.Streams
                     else
                         return vcn;
             }
-            
+
             return null;
         }
 
-        private int _resumeExtentIndex = 0;
-        private int _resumeRunIndex = 0;
-        private long _resumeVcn = 0;
-
-        public bool IsSparseVcn(long vcn)
+        internal ref struct SparseCheckState
         {
-            if (vcn < _resumeVcn)
+            internal int _resumeExtentIndex;
+            internal int _resumeRunIndex;
+            internal long _resumeVcn;
+        }
+
+        internal bool IsSparseVcn(long vcn, ref SparseCheckState resumeState)
+        {
+            if (vcn < resumeState._resumeVcn)
             {
                 // Caller went backwards
-                _resumeExtentIndex = _resumeRunIndex = 0;
-                _resumeVcn = 0;
+                resumeState._resumeExtentIndex = resumeState._resumeRunIndex = 0;
+                resumeState._resumeVcn = 0;
             }
 
-            for (int e = _resumeExtentIndex; e < Extents.Count; e++)
+            for (int e = resumeState._resumeExtentIndex; e < Extents.Count; e++)
             {
                 var runs = Extents[e].DataRuns;
-                for (int r = (e == _resumeExtentIndex ? _resumeRunIndex : 0); r < runs.Count; r++)
+                for (int r = (e == resumeState._resumeExtentIndex ? resumeState._resumeRunIndex : 0);
+                     r < runs.Count;
+                     r++)
                 {
                     var run = runs[r];
-                    if (vcn >= _resumeVcn && vcn < _resumeVcn + run.Length)
+                    if (vcn >= resumeState._resumeVcn && vcn < resumeState._resumeVcn + run.Length)
                     {
-                        _resumeExtentIndex = e;
-                        _resumeRunIndex = r;
+                        resumeState._resumeExtentIndex = e;
+                        resumeState._resumeRunIndex = r;
                         return run.Sparse;
                     }
-                    _resumeVcn += run.Length;
+
+                    resumeState._resumeVcn += run.Length;
                 }
             }
 
             throw new ArgumentOutOfRangeException(nameof(vcn),
-                $"Attempted to retrieve VCN {vcn}, but this stream only contains {_resumeVcn} clusters!");
+                $"Attempted to retrieve VCN {vcn}, but this stream only contains {resumeState._resumeVcn} clusters!");
         }
 
         public bool TryGetMemory(out Span<byte> memory)

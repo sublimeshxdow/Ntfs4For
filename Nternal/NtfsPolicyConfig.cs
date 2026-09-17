@@ -13,4 +13,8 @@ public class NtfsPolicyConfig
 
     // Default Limit for Windows - https://learn.microsoft.com/de-de/windows/win32/fileio/symbolic-link-programming-considerations
     public static int HopLimit { get; set; } = 63;
+
+    // Default value -1: .NET decides itself
+    public static int CompressionExtentParallelismThreshold { get; set; } = 4;
+    public static int CompressionMaxDegreeOfParallelism { get; set; } = -1;
 }
