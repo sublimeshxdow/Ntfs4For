@@ -33,16 +33,28 @@ internal class Program
 
         sysTime.Stop();
         Console.WriteLine(sysTime.Elapsed.TotalMilliseconds / 100);
-        
+
         // var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
         var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var entry = v.GetNtfsFile("Windows/WinSxS/");
+        var entry = v.GetNtfsFile("/");
         var index = v.CreateIndexParser(entry, "$I30");
 
+        var journal = v.GetJournalReader().GetJournalEntries().Where(x => x.ParentFileReference == entry.GetReference());
+
+        foreach (var a in journal)
+        {
+            if (a is BasicUsnEntry usnEntry)
+            {
+                Console.WriteLine(v.GetPrimaryAbsolutePath(a.FileReference));
+            }
+        }
+
+        return;
+        
         List<string> parsedNames = new();
         Console.WriteLine();
 
@@ -58,6 +70,7 @@ internal class Program
                 myFiles.Add(f.Name);
             }
         }
+
         myTime.Stop();
         Console.WriteLine(myTime.Elapsed.TotalMilliseconds / 100);
         Console.WriteLine("---");

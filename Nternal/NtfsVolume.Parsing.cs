@@ -64,10 +64,14 @@ namespace Nternal
             _hasParsedMftYet = true;
         }
 
+        public FileReference GetKnownMftReference(KnownMftRecord record)
+        {
+            return new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
+        }
+
         public NtfsFile GetKnownNtfsFile(KnownMftRecord record)
         {
-            var fileReference = new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
-            return GetNtfsFile(fileReference, true);
+            return GetNtfsFile(GetKnownMftReference(record), true);
         }
 
         public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
@@ -76,10 +80,40 @@ namespace Nternal
             return new NtfsFile(rawRecord, _provider, this, true);
         }
 
+        public string GetPrimaryAbsolutePath(FileReference reference)
+        {
+            FileReference root = GetKnownMftReference(KnownMftRecord.Root);
+            FileReference currentReference = reference;
+            StringBuilder sb = new(256);
+
+            while (currentReference != root)
+            {
+                NtfsFile? file;
+
+                try
+                {
+                    file = GetNtfsFile(currentReference);
+                }
+
+                catch (Exception ex)
+                {
+                    sb.Insert(0, "??");
+                    break;
+                }
+
+                var fileNameAttr = file.GetRequiredAttributeData<FileNameAttribute>(NtfsAttributeType.FileName, "");
+                currentReference = fileNameAttr.FileNameData.ParentFolder;
+                sb.Insert(0, $"/{fileNameAttr.FileNameData.Name}");
+            }
+
+            return sb.ToString();
+        }
+        
         public NtfsFile GetNtfsFile(string path)
         {
             if (RootFolder == null)
-                throw new InvalidOperationException("Cannot parse arbitrary NTFS files before initialization completed!");
+                throw new InvalidOperationException(
+                    "Cannot parse arbitrary NTFS files before initialization completed!");
 
             var components = new LinkedList<string>(path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries));
             var references = new Stack<FileReference>();
@@ -125,10 +159,12 @@ namespace Nternal
                     if (reparseData.TypeAndFlags.HasFlag(ReparseTypeAndFlags.SymbolicLink))
                     {
                         if (++symlinkHops > NtfsPolicyConfig.HopLimit)
-                            throw new InvalidOperationException("Too many symbolic link redirections -- possible loop.");
+                            throw new InvalidOperationException(
+                                "Too many symbolic link redirections -- possible loop.");
 
                         var symlinkData = reparseData.Data as SymbolicLinkReparseData
-                            ?? throw new InvalidOperationException($"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
+                                          ?? throw new InvalidOperationException(
+                                              $"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
 
                         if (!symlinkData.Flags.HasFlag(SymbolicLinkReparseData.SymlinkFlags.IsRelative))
                             throw new NotSupportedException(
