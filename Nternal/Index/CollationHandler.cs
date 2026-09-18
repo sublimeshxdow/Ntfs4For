@@ -51,7 +51,6 @@ public class CollationHandler
                 return key.SequenceCompareTo(target);
 
             case CollationRules.CollationFileName:
-                Console.WriteLine($"Comparing... {target.ReadUnicodeString(0, target.Length)} to {GetFileName(fullRawEntry)}");
                 return CompareUpcased(MemoryMarshal.Cast<byte, char>(target), GetFileName(fullRawEntry));
 
             case CollationRules.CollationUnicodeString:

@@ -1,6 +1,7 @@
 ﻿using Nternal.Core.Streams;
 using System;
 using System.Collections.Generic;
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace Nternal.Streams
@@ -16,6 +17,11 @@ namespace Nternal.Streams
         public ResidentDataStream(byte[] data)
         {
             _data = data;
+        }
+
+        public void LoadIntoMemory()
+        {
+            // It already is..
         }
 
         public int Read(long position, Span<byte> buffer)

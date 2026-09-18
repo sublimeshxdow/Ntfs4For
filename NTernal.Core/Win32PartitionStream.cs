@@ -24,6 +24,11 @@ namespace Nternal.Core
             AllocatedLength = length;
         }
 
+        public void LoadIntoMemory()
+        {
+            throw new NotImplementedException();
+        }
+
         public int Read(long position, Span<byte> buffer)
         {
             if (position < 0 || position > Length)

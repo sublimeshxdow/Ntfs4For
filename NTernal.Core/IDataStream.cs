@@ -6,6 +6,8 @@
         long AllocatedLength { get; }
         int Alignment { get; }
 
+        void LoadIntoMemory();
+        
         int Read(long position, Span<byte> buffer);
         void ReadExactly(long position, Span<byte> buffer);
 

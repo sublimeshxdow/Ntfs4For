@@ -35,6 +35,8 @@ namespace Nternal
             CollationHandler = new();
             ParseBootSector();
             ParseMft();
+            if (MftFile == null)
+                throw new Exception("Failed to parse the Mft..?");
 
             VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Volume);
             RootFolder = GetKnownNtfsFile(KnownMftRecord.Root);
@@ -89,6 +91,21 @@ namespace Nternal
                     throw new InvalidDataContractException(
                         $"$UpCase validation failed - written checksum {writtenChecksum.ToString("X16")}" +
                         $" does not match computed checksum {calculatedChecksum.ToString("X16")}!");
+            }
+        }
+        
+        public IEnumerable<(FileReference, FileNameData)> EnumerateDirectory(FileReference folder)
+        {
+            var file = GetNtfsFile(folder);
+            if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
+                throw new ArgumentException($"\"{GetPrimaryAbsolutePath(folder)}\" is not a directory!");
+
+            var index = CreateIndexParser(file, "$I30");
+            foreach (var entry in index.EnumerateEntries())
+            {
+                var parsedEntry = new FileNameData();
+                parsedEntry.Parse(entry.GetKey(), true);
+                yield return (entry.GetI30MftReference()!.Value, parsedEntry);
             }
         }
 

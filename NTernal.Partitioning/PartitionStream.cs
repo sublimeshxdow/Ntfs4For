@@ -17,6 +17,11 @@ namespace Nternal.Partitioning
             Entry = partition;
         }
 
+        public void LoadIntoMemory()
+        {
+            throw new NotImplementedException();
+        }
+
         public void Dispose()
         {
 

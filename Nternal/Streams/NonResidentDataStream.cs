@@ -1,7 +1,9 @@
 ﻿using Nternal.Core.Streams;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Nternal.Streams
@@ -25,7 +27,7 @@ namespace Nternal.Streams
         public long? InitializedSize { get; set; }
     }
 
-    public partial class NonResidentDataStream : IDataStream
+    public unsafe partial class NonResidentDataStream : IDataStream
     {
         private IDataStream _underlying;
         private int _bytesPerCluster;
@@ -43,8 +45,57 @@ namespace Nternal.Streams
             _bytesPerCluster = bytesPerCluster;
         }
 
+        private IntPtr MemoryBuffer = IntPtr.Zero;
+        private Lock _loadLock = new Lock();
+        private bool _hasCacheLoaded = false;
+
+        public void LoadIntoMemory()
+        {
+            const int BlockSize = 16777216;
+
+            lock (_loadLock)
+            {
+                if (MemoryBuffer != IntPtr.Zero)
+                    return;
+
+                long processed = 0, remaining = Length;
+                MemoryBuffer = Marshal.AllocHGlobal((nint)AllocatedLength);
+
+                while (true)
+                {
+                    var buffer = new Span<byte>((byte*)MemoryBuffer + processed, (int)Math.Min(remaining, BlockSize));
+                    int read = Read(processed, buffer);
+                    if (read < BlockSize)
+                        break;
+
+                    processed += read;
+                    remaining -= read;
+                }
+
+                _hasCacheLoaded = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (MemoryBuffer != IntPtr.Zero)
+                Marshal.FreeHGlobal(MemoryBuffer);
+        }
+
         public int Read(long position, Span<byte> buffer)
         {
+            if (_hasCacheLoaded)
+            {
+                ArgumentOutOfRangeException.ThrowIfNegative(position, nameof(position));
+                if (position >= Length || buffer.Length == 0)
+                    return 0;
+
+                long count = Math.Min(buffer.Length, Length - position);
+                var span = new Span<byte>((byte*)MemoryBuffer + position, (int)count);
+                span.CopyTo(buffer[..(int)count]);
+                return (int)count;
+            }
+
             if (position % Alignment != 0 || buffer.Length % Alignment != 0)
                 throw new ArgumentException("Both position & buffer-size must be aligned to the cluster size!");
 
@@ -122,10 +173,6 @@ namespace Nternal.Streams
         public void AddExtent(Extent extent)
         {
             Extents.Add(extent);
-        }
-
-        public void Dispose()
-        {
         }
     }
 }

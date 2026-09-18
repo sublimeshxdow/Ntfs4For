@@ -20,60 +20,45 @@ using Nternal.Structs;
 
 internal class Program
 {
+    private static long f = 0, m = 0;
+
+    static void EnumerateFolder(NtfsVolume vol, FileReference folderRef, int depth)
+    {
+        if (depth > 3) return;
+
+        foreach (var file in vol.EnumerateDirectory(folderRef))
+        {
+            if (file.Item2.Flags.HasFlag(FileFlags.Directory))
+            {
+                try
+                {
+                    EnumerateFolder(vol, file.Item1, depth + 1);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                }
+            }
+
+            f++;
+        }
+    }
+
     private static void Main(string[] args)
     {
-        Stopwatch sysTime = new();
-        List<string> sysFiles = new();
-        sysTime.Start();
-        for (int i = 0; i < 100; i++)
-        {
-            foreach (string file in Directory.EnumerateFileSystemEntries("/mnt/Windows/WinSxS/").ToList())
-                sysFiles.Add(file);
-        }
-
-        sysTime.Stop();
-        Console.WriteLine(sysTime.Elapsed.TotalMilliseconds / 100);
-
         // var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
         var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var entry = v.GetNtfsFile("/");
-        var index = v.CreateIndexParser(entry, "$I30");
-
-        var journal = v.GetJournalReader().GetJournalEntries().Where(x => x.ParentFileReference == entry.GetReference());
-
-        foreach (var a in journal)
-        {
-            if (a is BasicUsnEntry usnEntry)
-            {
-                Console.WriteLine(v.GetPrimaryAbsolutePath(a.FileReference));
-            }
-        }
-
-        return;
-        
-        List<string> parsedNames = new();
-        Console.WriteLine();
-
-        Stopwatch myTime = new();
-        List<string> myFiles = new();
-        myTime.Start();
-        for (int a = 0; a < 100; a++)
-        {
-            foreach (var i in index.EnumerateEntries())
-            {
-                var f = new FileNameData();
-                f.Parse(i.GetKey(), true);
-                myFiles.Add(f.Name);
-            }
-        }
-
-        myTime.Stop();
-        Console.WriteLine(myTime.Elapsed.TotalMilliseconds / 100);
-        Console.WriteLine("---");
-        Console.WriteLine($"{sysFiles.Count}/{myFiles.Count}");
+        Stopwatch s = new Stopwatch();
+        s.Start();
+        for (int i = 0; i < 1; i++)
+            EnumerateFolder(v, new FileReference(5, 5), 0);
+        s.Stop();
+        ;
+        Console.WriteLine(s.Elapsed.TotalMilliseconds / 1);
+        Console.WriteLine(f);
     }
 }

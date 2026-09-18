@@ -26,20 +26,19 @@ public class IndexParser
         IndexAllocation = file.GetAttributeData<IndexAllocationAttribute>(NtfsAttributeType.IndexAllocation, index);
         Bitmap = file.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, index);
 
-        Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag((NtfsPolicyConfig.PolicyFlags &
-                                                         NtfsPolicyConfig.Flags.ParanoidParsing));
+        Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing);
         CollationHandler = handler;
         FixupHelper = helper;
     }
 
     public IndexParser(IndexRootAttribute root, IndexAllocationAttribute? allocation, BitmapAttribute? bitmap,
-        FixupHelper helper)
+        CollationHandler handler, FixupHelper helper)
     {
         IndexRoot = root;
         IndexAllocation = allocation;
         Bitmap = bitmap;
-        Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag((NtfsPolicyConfig.PolicyFlags &
-                                                         NtfsPolicyConfig.Flags.ParanoidParsing));
+        Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing);
+        CollationHandler = handler;
         FixupHelper = helper;
     }
 
@@ -126,7 +125,7 @@ public class IndexParser
         int offset = 0x18 + indexBuffer.AsSpan().ReadUInt16(0x18);
         return indexBuffer.AsSpan(offset).ToArray();
     }
-    
+
     private IndexEntry? TryFindAllocationEntry(long node, ReadOnlySpan<byte> key)
     {
         // We do not have a valid index-allocation => null
