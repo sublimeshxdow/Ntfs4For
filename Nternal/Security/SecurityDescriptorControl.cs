@@ -52,5 +52,5 @@ public enum SecurityDescriptorControl : ushort
     /// persisted to disk -- the absolute form (raw pointers) cannot be
     /// stored or transmitted at all.
     /// </summary>
-    SelfRelative = 0x8000,
+    SelfRelative = 0x8000
 }

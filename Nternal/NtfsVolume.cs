@@ -41,6 +41,9 @@ namespace Nternal
             VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Volume);
             RootFolder = GetKnownNtfsFile(KnownMftRecord.Root);
             SetupUpcaseTable();
+
+            VolumeClusterFile = GetKnownNtfsFile(KnownMftRecord.BadClus);
+            VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Bitmap);
         }
 
         public UsnJournalReader GetJournalReader() =>
@@ -93,7 +96,7 @@ namespace Nternal
                         $" does not match computed checksum {calculatedChecksum.ToString("X16")}!");
             }
         }
-        
+
         public IEnumerable<(FileReference, FileNameData)> EnumerateDirectory(FileReference folder)
         {
             var file = GetNtfsFile(folder);
@@ -109,14 +112,95 @@ namespace Nternal
             }
         }
 
+        public DataRun[] GetBadClusterRanges()
+        {
+            List<DataRun> badClusters = new();
+            var data = VolumeClusterFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "$Bad");
+            if (data.Underlying.Accessor is not NonResidentDataStream stream)
+                throw new InvalidDataException(
+                    $"$BadClus:$Bad is resident — this should never happen on a healthy volume!");
+
+            foreach (var run in stream.Extents.SelectMany(x => x.DataRuns))
+            {
+                if (run.Sparse)
+                    continue;
+
+                badClusters.Add(run);
+            }
+
+            return badClusters.ToArray();
+        }
+
+        public ClusterState GetClusterState(long cluster)
+        {
+            if (cluster < 0 || cluster >= BootSector.TotalClusters)
+                throw new ArgumentOutOfRangeException(nameof(cluster),
+                    $"Cluster {cluster} is out of range - must be within 0 and {BootSector.TotalClusters}!");
+
+            ClusterState state = ClusterState.Free;
+            if (BadClusterRanges.Any(run =>
+                    !(cluster < run.StartingCluster) && !(cluster > run.StartingCluster + run.Length - 1)))
+            {
+                state |= ClusterState.Bad;
+            }
+
+            if (ClusterMap.IsSet(cluster))
+                state |= ClusterState.Allocated;
+
+            return state;
+        }
+
+        public bool IsClusterUsed(long cluster)
+        {
+            if (cluster < 0 || cluster >= BootSector.TotalClusters)
+                throw new ArgumentOutOfRangeException(nameof(cluster),
+                    $"Cluster {cluster} is out of range - must be within 0 and {BootSector.TotalClusters}!");
+
+            return ClusterMap.IsSet(cluster);
+        }
+
         internal IDataStream GetUnderlyingStream() => _provider;
 
         private bool _hasParsedMftYet = false;
         private IDataStream? _mftStream = null;
 
         public NtfsFile? MftFile { get; private set; }
-        public NtfsFile? VolumeBitmapFile { get; private set; }
-        public NtfsFile? RootFolder { get; private set; }
         public NtfsFile? UpcaseFile { get; private set; }
+
+        public NtfsFile? VolumeBitmapFile { get; private set; }
+
+        private DataRun[] BadClusterRanges
+        {
+            get
+            {
+                _cachedBadRanges ??= GetBadClusterRanges();
+                return _cachedBadRanges;
+            }
+        }
+
+        private BitmapAttribute? ClusterMap
+        {
+            get
+            {
+                if (_rawClusterMap == null)
+                {
+                    var bitmap = VolumeBitmapFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
+                    _rawClusterMap = new BitmapAttribute()
+                    {
+                        Underlying = bitmap.Underlying
+                    };
+                    _rawClusterMap.ParseFromAccessor(true);
+                }
+
+                return _rawClusterMap;
+            }
+        }
+
+        private DataRun[]? _cachedBadRanges;
+        private BitmapAttribute? _rawClusterMap;
+
+        public NtfsFile? VolumeClusterFile { get; private set; }
+
+        public NtfsFile? RootFolder { get; private set; }
     }
 }

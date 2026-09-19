@@ -40,11 +40,15 @@ public class RunHelpers
             if (lengthOfLength > 8 || lengthOfOffset > 8)
                 throw new InvalidDataException(
                     $"Invalid data-run header 0x{lengthField:X2}: field size must be 0-8 bytes.");
-
+            
+            // Let's treat the list shape as authoritative - not only compressed (not sparse-flagged)
+            // have sparse runs, but so does $BadClus:$Bad
+            /*
             if (!acceptSparse && lengthOfOffset == 0)
                 throw new InvalidDataException(
                     $"Attempted to parse a data-run with a zero-length offset field, but the extend is not flagged as sparse!");
-
+            */
+            
             long currentOffsetRaw = 0, currentLength = 0;
             for (int i = 0; i < lengthOfLength; i++)
                 currentLength |= (long)data[offset++] << (i * 8);

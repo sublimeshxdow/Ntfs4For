@@ -1,5 +1,6 @@
 using Nternal.Extensions;
 using System;
+using System.Security.AccessControl;
 
 namespace Nternal.Ntfs.Security;
 
@@ -7,8 +8,8 @@ public class Ace
 {
     public AceType Type { get; }
     public AceFlags Flags { get; }
-    public ushort Size { get; }
-    public uint Mask { get; }
+    internal ushort Size { get; }
+    public FileSystemRights AccessMask { get; }
     public Sid Sid { get; }
 
     private static readonly AceType[] ObjectAceTypes =
@@ -60,7 +61,7 @@ public class Ace
         Type = (AceType)aceData[0];
         Flags = (AceFlags)aceData[1];
         Size = aceData.ReadUInt16(2);
-        Mask = aceData.ReadUInt32(4);
+        AccessMask = (FileSystemRights)aceData.ReadUInt32(4);
         Sid = new Sid(aceData[sidOffset..], paranoid);
     }
 }

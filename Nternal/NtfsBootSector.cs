@@ -49,6 +49,9 @@ namespace Nternal
         /// <summary>Total number of sectors in the volume.</summary>
         public long TotalSectors { get; }
 
+        /// <summary>Total number of clusters in the volume.</summary>
+        public long TotalClusters { get; }
+
         /// <summary>Starting cluster number (LCN) of the $MFT.</summary>
         public long MftClusterNumber { get; }
 
@@ -107,6 +110,8 @@ namespace Nternal
             HiddenSectors = BinaryPrimitives.ReadUInt32LittleEndian(sector[0x1C..]);                  // 4 bytes
 
             TotalSectors = BinaryPrimitives.ReadInt64LittleEndian(sector[0x28..]);                    // 8 bytes (signed)
+            TotalClusters = TotalSectors / SectorsPerCluster;
+            
             MftClusterNumber = BinaryPrimitives.ReadInt64LittleEndian(sector[0x30..]);                // 8 bytes (signed)
             MftMirrClusterNumber = BinaryPrimitives.ReadInt64LittleEndian(sector[0x38..]);            // 8 bytes (signed)
 

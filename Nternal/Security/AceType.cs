@@ -24,5 +24,5 @@ public enum AceType : byte
     /// <summary>Dynamic Access Control claims.</summary>
     SystemResourceAttribute = 0x12,
  
-    SystemScopedPolicyId = 0x13,
+    SystemScopedPolicyId = 0x13
 }

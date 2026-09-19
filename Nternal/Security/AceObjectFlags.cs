@@ -9,5 +9,5 @@ public enum AceObjectFlags : uint
     ObjectTypePresent = 0x00000001,
  
     /// <summary>InheritedObjectType GUID is present.</summary>
-    InheritedObjectTypePresent = 0x00000002,
+    InheritedObjectTypePresent = 0x00000002
 }

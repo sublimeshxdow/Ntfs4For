@@ -7,6 +7,7 @@ using Nternal.Helpers;
 using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
 using Nternal.Ntfs.Index;
+using Nternal.Ntfs.Security;
 using Nternal.Structs;
 
 namespace Nternal

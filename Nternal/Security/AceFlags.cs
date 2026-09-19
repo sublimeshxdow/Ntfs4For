@@ -24,5 +24,5 @@ public enum AceFlags : byte
     SuccessfulAccess = 0x40,
  
     /// <summary>SACL only: generate an audit entry on failed access.</summary>
-    FailedAccess = 0x80,
+    FailedAccess = 0x80
 }

@@ -52,13 +52,17 @@ internal class Program
         NtfsVolume v = new(stream);
         v.Mount();
 
-        Stopwatch s = new Stopwatch();
-        s.Start();
-        for (int i = 0; i < 1; i++)
-            EnumerateFolder(v, new FileReference(5, 5), 0);
-        s.Stop();
-        ;
-        Console.WriteLine(s.Elapsed.TotalMilliseconds / 1);
-        Console.WriteLine(f);
+        var file = v.GetNtfsFile("/$Boot");
+        file.NtfsAttributes.Where(x => x.Type == NtfsAttributeType.SecurityDescriptor)
+            .First()
+            .Accessor.TryGetMemory(out Span<byte> data);
+
+        for (int i = 0; i < v.BootSector.TotalSectors / v.BootSector.SectorsPerCluster; i++)
+        {
+            var bad = v.GetClusterState(i);
+        }
+
+        var sd = file.GetRequiredAttributeData<SecurityDescriptorAttribute>(NtfsAttributeType.SecurityDescriptor, "");
+        Console.ReadKey();
     }
 }
