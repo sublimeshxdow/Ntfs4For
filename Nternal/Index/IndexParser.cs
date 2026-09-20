@@ -132,9 +132,7 @@ public class IndexParser
         if (IndexAllocation == null || Bitmap == null)
             return null;
 
-        var fullBuffer = GetIndexBuffer(node);
-        int offset = 0x18 + fullBuffer.AsSpan().ReadUInt16(0x18);
-        return LookInIndexTree(fullBuffer, key);
+        return LookInIndexTree(GetIndexBuffer(node), key);
     }
 
     private IndexEntry? LookInIndexTree(ReadOnlySpan<byte> bufferData, ReadOnlySpan<byte> key)

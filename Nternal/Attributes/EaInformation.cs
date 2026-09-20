@@ -9,6 +9,8 @@ namespace Nternal.Attributes
 {
     public class EaInformationAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.EaInfo;
+      
         public NtfsAttribute Underlying { get; init; } = null!;
 
         public ushort SizeOfPackedEAs { get; set; }

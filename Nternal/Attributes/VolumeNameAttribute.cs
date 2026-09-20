@@ -5,9 +5,11 @@ namespace Nternal.Ntfs.Attributes;
 
 public class VolumeNameAttribute : IParsableAttribute
 {
+    public static NtfsAttributeType AttributeType => NtfsAttributeType.VolumeName;
+
     public NtfsAttribute Underlying { get; init; } = null!;
     public string VolumeName { get; private set; }
-    
+
     public void ParseFromAccessor(bool paranoid)
     {
         Span<byte> buffer = new byte[Underlying.Accessor.AllocatedLength];

@@ -9,6 +9,7 @@ using Nternal.Helpers;
 using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
 using Nternal.Ntfs.Compression;
+using Nternal.Ntfs.Hashing;
 using Nternal.Ntfs.Index;
 using Nternal.Ntfs.NtfsExtensions;
 using Nternal.Ntfs.NtfsExtensions.Journal;
@@ -20,49 +21,78 @@ using Nternal.Structs;
 
 internal class Program
 {
-    private static long f = 0, m = 0;
-
-    static void EnumerateFolder(NtfsVolume vol, FileReference folderRef, int depth)
-    {
-        if (depth > 3) return;
-
-        foreach (var file in vol.EnumerateDirectory(folderRef))
-        {
-            if (file.Item2.Flags.HasFlag(FileFlags.Directory))
-            {
-                try
-                {
-                    EnumerateFolder(vol, file.Item1, depth + 1);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                }
-            }
-
-            f++;
-        }
-    }
-
     private static void Main(string[] args)
-    {
+    {byte[] sdsEntry1 =
+        {
+            // --- $SDS entry header (20 bytes) ---
+                     // Hash = 0xF80312F0
+  
+
+            // --- SECURITY_DESCRIPTOR_RELATIVE body (104 bytes, starts here) ---
+            0x01, 0x00, 0x04, 0x80,             // Revision=1, Sbz1=0, Control=SE_SELF_RELATIVE|SE_DACL_PRESENT
+            0x48, 0x00, 0x00, 0x00,             // OwnerOffset = 0x48
+            0x58, 0x00, 0x00, 0x00,             // GroupOffset = 0x58
+            0x00, 0x00, 0x00, 0x00,             // SaclOffset = 0 (no SACL)
+            0x14, 0x00, 0x00, 0x00,             // DaclOffset = 0x14
+
+            // ACL header
+            0x02, 0x00, 0x34, 0x00, 0x02, 0x00, 0x00, 0x00,
+
+            // ACE #1 (SYSTEM, mask=0x120089)
+            0x00, 0x00, 0x14, 0x00, 0x89, 0x00, 0x12, 0x00,
+            0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x12, 0x00, 0x00, 0x00,
+
+            // ACE #2 (BUILTIN\Administrators, mask=0x120089)
+            0x00, 0x00, 0x18, 0x00, 0x89, 0x00, 0x12, 0x00,
+            0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x20, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00,
+
+            // Owner SID (BUILTIN\Administrators)
+            0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x20, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00,
+
+            // Group SID (BUILTIN\Administrators)
+            0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x20, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00,
+        };
+        // Source: ntfsprogs sd.c, init_secure_sds(), "security descriptor #2".
+// Only differs from #1 in: SecurityId, Offset, and both ACE masks (0x12019F).
+// Independently verified: hashes to exactly 0xB32451.
+        byte[] sdsEntry2 =
+        {
+              // Hash = 0xB32451
+
+
+            0x01, 0x00, 0x04, 0x80,
+            0x48, 0x00, 0x00, 0x00,
+            0x58, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x14, 0x00, 0x00, 0x00,
+
+            0x02, 0x00, 0x34, 0x00, 0x02, 0x00, 0x00, 0x00,
+
+            0x00, 0x00, 0x14, 0x00, 0x9F, 0x01, 0x12, 0x00,
+            0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x12, 0x00, 0x00, 0x00,
+
+            0x00, 0x00, 0x18, 0x00, 0x9F, 0x01, 0x12, 0x00,
+            0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x20, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00,
+
+            0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x20, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00,
+
+            0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x20, 0x00, 0x00, 0x00, 0x20, 0x02, 0x00, 0x00,
+        };
+
+        var h1 = SecurityHashing.HashSecurityDescriptor(sdsEntry1);
+        var h2 = SecurityHashing.HashSecurityDescriptor(sdsEntry2);
+        
+        Console.WriteLine(h1 == 0xF80312F0);
+        Console.WriteLine(h2 == 0xB32451);
+        return;
+        
         // var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
         var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
         v.Mount();
 
-        var file = v.GetNtfsFile("/$Boot");
-        file.NtfsAttributes.Where(x => x.Type == NtfsAttributeType.SecurityDescriptor)
-            .First()
-            .Accessor.TryGetMemory(out Span<byte> data);
-
-        for (int i = 0; i < v.BootSector.TotalSectors / v.BootSector.SectorsPerCluster; i++)
-        {
-            var bad = v.GetClusterState(i);
-        }
-
-        var sd = file.GetRequiredAttributeData<SecurityDescriptorAttribute>(NtfsAttributeType.SecurityDescriptor, "");
-        Console.ReadKey();
+        var file = v.GetNtfsFile($"/$Mft");
+        var sdh = v.GetSecurityDescriptor(file);
     }
 }

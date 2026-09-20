@@ -23,12 +23,14 @@ namespace Nternal.Attributes
 
     public class LoggedUtilityStreamAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.LoggedUtilityStream;
+
         public NtfsAttribute Underlying { get; init; } = null!;
 
         // ---- Outer header offsets (MS-EFSR 2.2.2.1 -- spec-documented) ----
         private const int LengthOffset = 0x00;
         private const int VersionOffset = 0x08;
-        private const int EfsIdOffset = 0x10;   // 16 bytes
+        private const int EfsIdOffset = 0x10; // 16 bytes
         private const int EfsHashOffset = 0x20; // 16 bytes
         private const int DdfOffsetOffset = 0x40;
         private const int DrfOffsetOffset = 0x44;
@@ -198,6 +200,7 @@ namespace Nternal.Attributes
                 sb.Append('-').Append(BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(p, 4)));
                 p += 4;
             }
+
             return sb.ToString();
         }
 
@@ -211,6 +214,7 @@ namespace Nternal.Attributes
                     return Encoding.Unicode.GetString(data.Slice(0, i));
                 }
             }
+
             throw new ArgumentException("String is not zero-terminated");
         }
     }

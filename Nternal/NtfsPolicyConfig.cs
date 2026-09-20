@@ -7,7 +7,8 @@ public class NtfsPolicyConfig
     {
         ParanoidParsing = 0x00000001,
         ParanoidParsingUrnJrnl = 0x00000002,
-        ValidateUpcase = 0x00000004
+        ValidateUpcase = 0x00000004,
+        ValidateSdh = 0x00000008
     }
 
     public static bool ListPosixFileNames { get; set; } = true;

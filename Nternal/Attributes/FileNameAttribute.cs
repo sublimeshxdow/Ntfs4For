@@ -17,6 +17,8 @@ namespace Nternal.Attributes
 
     public class FileNameAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.FileName;
+       
         public NtfsAttribute Underlying { get; init; } = null!;
         public FileNameData FileNameData { get; private set; }
 

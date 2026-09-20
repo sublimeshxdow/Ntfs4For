@@ -28,7 +28,7 @@ namespace Nternal.Attributes
         {
             _ntfsVolume = ntfsVolume;
             FileRecord = record;
-            
+
             ReadOnlySpan<byte> attributeBuffer = record.AttributeData;
 
             while (true)
@@ -38,25 +38,30 @@ namespace Nternal.Attributes
                     break;
 
                 RawAttributeHeader header = MemoryMarshal.Cast<byte, RawAttributeHeader>(attributeBuffer)[0];
-                string name = Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength * 2));
+                string name =
+                    Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength * 2));
 
                 if (header.NonResidentFlag == 0)
                 {
-                    RawResidentAttributeHeader residentHeader = MemoryMarshal.Cast<byte, RawResidentAttributeHeader>(attributeBuffer)[0];
-                    ReadOnlySpan<byte> data = attributeBuffer.Slice(residentHeader.AttributeOffset, (int)residentHeader.AttributeLength);
+                    RawResidentAttributeHeader residentHeader =
+                        MemoryMarshal.Cast<byte, RawResidentAttributeHeader>(attributeBuffer)[0];
+                    ReadOnlySpan<byte> data = attributeBuffer.Slice(residentHeader.AttributeOffset,
+                        (int)residentHeader.AttributeLength);
                     ParseResidentAttribute(residentHeader, name, data);
                 }
 
                 else
                 {
-                    RawNonResidentAttributeHeader nonResidentHeader = MemoryMarshal.Cast<byte, RawNonResidentAttributeHeader>(attributeBuffer)[0];
-                    ReadOnlySpan<byte> dataRuns = attributeBuffer.Slice(nonResidentHeader.DataRunsOffset, (int)(header.Length - nonResidentHeader.DataRunsOffset));
+                    RawNonResidentAttributeHeader nonResidentHeader =
+                        MemoryMarshal.Cast<byte, RawNonResidentAttributeHeader>(attributeBuffer)[0];
+                    ReadOnlySpan<byte> dataRuns = attributeBuffer.Slice(nonResidentHeader.DataRunsOffset,
+                        (int)(header.Length - nonResidentHeader.DataRunsOffset));
                     ParseNonResidentAttribute(nonResidentHeader, name, dataRuns, underlying);
                 }
 
                 attributeBuffer = attributeBuffer.Slice((int)header.Length);
             }
-            
+
             ProcessAttributeListIfPresent();
         }
 
@@ -71,7 +76,40 @@ namespace Nternal.Attributes
 
         public T GetRequiredAttributeData<T>(NtfsAttributeType type, string name) where T : IParsableAttribute, new()
         {
-            return GetAttributeData<T>(type, name) ?? throw new KeyNotFoundException($"Could not find attribute \"{name}\" of type {type} in record {GetReference()}!");
+            return GetAttributeData<T>(type, name) ??
+                   throw new KeyNotFoundException(
+                       $"Could not find attribute \"{name}\" of type {type} in record {GetReference()}!");
+        }
+
+        public IDataStream GetDataStream(string name = "")
+        {
+            var attribute = NtfsAttributes
+                .Where(x => x.Type == NtfsAttributeType.Data)
+                .FirstOrDefault(x => x.Name == name);
+
+            if (attribute == null)
+                throw new FileNotFoundException(
+                    $"Could not find {(name.Length == 0 ? "unnamed data-stream" : $"data-stream named \"{name}\"")} within file!");
+
+            return attribute.Cast<DataAttribute>().GetStream();
+        }
+
+        public T? GetAttributeData<T>(string name = "") where T : IParsableAttribute, new()
+        {
+            var attribute = NtfsAttributes
+                .Where(x => x.Name == name)
+                .FirstOrDefault(x => x.Type == T.AttributeType);
+
+            return attribute == null ? default : attribute.Cast<T>();
+        }
+
+        public T[] GetAttributeDataArray<T>(string name = "") where T : IParsableAttribute, new()
+        {
+            return NtfsAttributes
+                .Where(x => x.Name == name)
+                .Where(x => x.Type == T.AttributeType)
+                .Select(x => x.Cast<T>())
+                .ToArray();
         }
 
         private void ParseResidentAttribute(RawResidentAttributeHeader header, string name, ReadOnlySpan<byte> data)
@@ -89,7 +127,8 @@ namespace Nternal.Attributes
             });
         }
 
-        private void ParseNonResidentAttribute(RawNonResidentAttributeHeader header, string name, ReadOnlySpan<byte> dataruns, IDataStream underlying)
+        private void ParseNonResidentAttribute(RawNonResidentAttributeHeader header, string name,
+            ReadOnlySpan<byte> dataruns, IDataStream underlying)
         {
             var extent = RunHelpers.GetExtentOfNrh(header, dataruns);
 
@@ -102,7 +141,7 @@ namespace Nternal.Attributes
                         $"Found an existing, corresponding attribute to the one attempted to parse"
                         + $" (Type={matchingAttribute.Type}, Name={matchingAttribute.Name}, <=> Type={header.Common.Type}, Name={name})"
                         + $", but the found accessor is not a NonResidentDataStream, but of type {matchingAttribute.Accessor.GetType().ToString()} - this should never happen on a healthy volume!");
-                
+
                 stream.AddExtent(extent);
             }
             else
@@ -118,7 +157,7 @@ namespace Nternal.Attributes
                     Accessor = new NonResidentDataStream(underlying, _ntfsVolume.BootSector.BytesPerCluster),
                     BytesPerCluster = _ntfsVolume.BootSector.BytesPerCluster
                 };
-                
+
                 ((NonResidentDataStream)attribute.Accessor).AddExtent(extent);
                 NtfsAttributes.Add(attribute);
             }
@@ -139,7 +178,7 @@ namespace Nternal.Attributes
                 return;
 
             var data = attributeList.Cast<AttributeListAttribute>();
-            data.ParseFromAccessor( true);
+            data.ParseFromAccessor(true);
 
             FileRecordMerger merger = new(_ntfsVolume, this, _ntfsVolume.MftFile == null);
             foreach (var entry in data.Entries)

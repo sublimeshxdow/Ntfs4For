@@ -8,6 +8,8 @@ namespace Nternal.Ntfs.Attributes;
 
 public class IndexRootAttribute : IParsableAttribute
 {
+    public static NtfsAttributeType AttributeType => NtfsAttributeType.IndexRoot;
+
     public NtfsAttribute Underlying { get; init; } = null!;
     public IDataStream GetStream() => Underlying.Accessor;
 

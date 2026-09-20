@@ -12,17 +12,17 @@ namespace Nternal.Attributes
     {
         None = 0,
         IsReserved = 0x10000000,
-        IsAlias = 0x20000000,        // official name: "Name Surrogate" (IsReparseTagNameSurrogate)
+        IsAlias = 0x20000000, // official name: "Name Surrogate" (IsReparseTagNameSurrogate)
         IsHighLatency = 0x40000000,
         IsMicrosoft = 0x80000000,
 
-        MountPoint = 0xA0000003,     // was 0x88000003 -- missing the Name Surrogate bit entirely
-        HSM = 0xC0000004,            // was 0xA8000004
+        MountPoint = 0xA0000003, // was 0x88000003 -- missing the Name Surrogate bit entirely
+        HSM = 0xC0000004, // was 0xA8000004
         HSM2 = 0x80000006,
-        SIS = 0x80000007,            // was 0x68000007
+        SIS = 0x80000007, // was 0x68000007
         WIM = 0x80000008,
-        DFS = 0x8000000A,            // was 0x68000008
-        SymbolicLink = 0xA000000C,   // was 0xE8000000 -- wrong M/N bits AND wrong low-16 kind value
+        DFS = 0x8000000A, // was 0x68000008
+        SymbolicLink = 0xA000000C, // was 0xE8000000 -- wrong M/N bits AND wrong low-16 kind value
         DFSR = 0x80000012,
         Deduplication = 0x80000013,
         NFS = 0x80000014,
@@ -56,13 +56,14 @@ namespace Nternal.Attributes
 
     public class MountPointReparseData : NameSurrogateReparseData
     {
-
     }
 
-    public class ReparseAttribute: IParsableAttribute
+    public class ReparseAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.Reparse;
+
         public NtfsAttribute Underlying { get; init; } = null!;
-        
+
         public void ParseFromAccessor(bool paranoid)
         {
             Span<byte> buffer = new byte[Underlying.Accessor.AllocatedLength];
@@ -95,21 +96,26 @@ namespace Nternal.Attributes
                     ushort substNameLength = reparseData.ReadUInt16(2);
                     ushort printNameOffset = reparseData.ReadUInt16(4);
                     ushort printNameLength = reparseData.ReadUInt16(6);
-                    var symlinkFlag = isSymlink ? (SymbolicLinkReparseData.SymlinkFlags?)reparseData.ReadUInt32(8) : null;
+                    var symlinkFlag =
+                        isSymlink ? (SymbolicLinkReparseData.SymlinkFlags?)reparseData.ReadUInt32(8) : null;
 
                     if (symlinkFlag != null)
                         Data = new SymbolicLinkReparseData
                         {
-                            SubstituteName = Encoding.Unicode.GetString(reparseData.Slice(12 + substNameOffset, substNameLength)),
-                            PrintName = Encoding.Unicode.GetString(reparseData.Slice(12 + printNameOffset, printNameLength)),
+                            SubstituteName =
+                                Encoding.Unicode.GetString(reparseData.Slice(12 + substNameOffset, substNameLength)),
+                            PrintName = Encoding.Unicode.GetString(reparseData.Slice(12 + printNameOffset,
+                                printNameLength)),
                             Flags = symlinkFlag.Value
                         };
 
                     else
                         Data = new MountPointReparseData
                         {
-                            SubstituteName = Encoding.Unicode.GetString(reparseData.Slice(8 + substNameOffset, substNameLength)),
-                            PrintName = Encoding.Unicode.GetString(reparseData.Slice(8 + printNameOffset, printNameLength))
+                            SubstituteName =
+                                Encoding.Unicode.GetString(reparseData.Slice(8 + substNameOffset, substNameLength)),
+                            PrintName = Encoding.Unicode.GetString(reparseData.Slice(8 + printNameOffset,
+                                printNameLength))
                         };
                     break;
 

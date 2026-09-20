@@ -7,6 +7,8 @@ namespace Nternal.Attributes
 {
     public class StandardInformationAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.StandardInformation;
+
         public NtfsAttribute Underlying { get; init; } = null!;
 
         public void ParseFromAccessor(bool paranoid)

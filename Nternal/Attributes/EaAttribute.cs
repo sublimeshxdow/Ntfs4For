@@ -15,6 +15,8 @@ namespace Nternal.Attributes
 
     public class EaAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.Ea;
+
         public NtfsAttribute Underlying { get; init; } = null!;
 
         public class Entry

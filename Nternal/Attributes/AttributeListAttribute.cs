@@ -11,6 +11,8 @@ namespace Nternal.Attributes
 {
     public class AttributeListAttribute : IParsableAttribute
     {
+        public static NtfsAttributeType AttributeType => NtfsAttributeType.AttributeList;
+
         public NtfsAttribute Underlying { get; init; } = null!;
         public List<Entry> Entries { get; } = [];
 

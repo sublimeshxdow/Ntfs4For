@@ -48,7 +48,7 @@ public class CollationHandler
         switch (rule)
         {
             case CollationRules.CollationBinary:
-                return key.SequenceCompareTo(target);
+                return target.SequenceCompareTo(key);
 
             case CollationRules.CollationFileName:
                 return CompareUpcased(MemoryMarshal.Cast<byte, char>(target), GetFileName(fullRawEntry));
@@ -57,26 +57,25 @@ public class CollationHandler
                 return string.Compare(target.ReadUnicodeString(0, target.Length), DecodeUtf16(key), StringComparison.InvariantCulture);
 
             case CollationRules.CollationNtofsUlong:
-                return key.ReadUInt32(0).CompareTo(target.ReadUInt32(0));
+                return target.ReadUInt32(0).CompareTo(key.ReadUInt32(0));
 
             case CollationRules.CollationNtofsSid:
-                return key[2..].SequenceCompareTo(target[2..]);
+                return target[2..].SequenceCompareTo(key[2..]);
 
             case CollationRules.CollationNtofsSecurityHash:
-                int cmp = key.ReadUInt32(0).CompareTo(target.ReadUInt32(0));
-                return cmp != 0 ? cmp : key.ReadUInt32(4).CompareTo(target.ReadUInt32(4));
+                int cmp = target.ReadUInt32(0).CompareTo(key.ReadUInt32(0));
+                return cmp != 0 ? cmp : target.ReadUInt32(4).CompareTo(key.ReadUInt32(4));
             
             case CollationRules.CollationNtofsUlongs:
                 if (key.Length != target.Length)
-                    return key.Length < target.Length ? -1 : 1;
-                    
+                    return target.Length < key.Length ? -1 : 1;           // also flipped
+
                 for (int i = 0; i < key.Length; i += 4)
                 {
-                    uint u1 = key.ReadUInt32(i), u2 = target.ReadUInt32(i);
+                    uint u1 = target.ReadUInt32(i), u2 = key.ReadUInt32(i);
                     if (u1 != u2)
                         return u1.CompareTo(u2);
                 }
-
                 return 0;
 
             default: throw new ArgumentException(nameof(rule), $"Invalid collation rule ({rule})!");

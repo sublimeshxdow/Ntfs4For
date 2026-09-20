@@ -44,6 +44,7 @@ namespace Nternal
 
             VolumeClusterFile = GetKnownNtfsFile(KnownMftRecord.BadClus);
             VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Bitmap);
+            SecureFile = GetKnownNtfsFile(KnownMftRecord.Secure);
         }
 
         public UsnJournalReader GetJournalReader() =>
@@ -97,7 +98,12 @@ namespace Nternal
             }
         }
 
-        public IEnumerable<(FileReference, FileNameData)> EnumerateDirectory(FileReference folder)
+        public IEnumerable<FolderEntry> EnumerateDirectory(string path)
+        {
+            return EnumerateDirectory(GetNtfsFile(path).GetReference());
+        }
+
+        public IEnumerable<FolderEntry> EnumerateDirectory(FileReference folder)
         {
             var file = GetNtfsFile(folder);
             if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
@@ -105,11 +111,7 @@ namespace Nternal
 
             var index = CreateIndexParser(file, "$I30");
             foreach (var entry in index.EnumerateEntries())
-            {
-                var parsedEntry = new FileNameData();
-                parsedEntry.Parse(entry.GetKey(), true);
-                yield return (entry.GetI30MftReference()!.Value, parsedEntry);
-            }
+                yield return new FolderEntry(entry.GetI30MftReference()!.Value, entry.GetKey());
         }
 
         public DataRun[] GetBadClusterRanges()
@@ -202,5 +204,7 @@ namespace Nternal
         public NtfsFile? VolumeClusterFile { get; private set; }
 
         public NtfsFile? RootFolder { get; private set; }
+
+        public NtfsFile SecureFile { get; private set; }
     }
 }

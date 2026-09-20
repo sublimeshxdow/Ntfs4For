@@ -60,23 +60,26 @@ public class CompressedDataStream : IDataStream
 
     public int Read(long position, Span<byte> buffer)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(position, nameof(position));
+        if (position >= Length || buffer.Length == 0)
+            return 0;
+
+        int logicalCount = (int)Math.Min(buffer.Length, Length - position);
+
         if (_isCached)
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(position, nameof(position));
-            if (position >= _underlying.Length || buffer.Length == 0)
-                return 0;
-
-            int count = Math.Min(buffer.Length, (int)(_underlying.Length - position));
-            _cached.AsSpan((int)position, count).CopyTo(buffer);
-            return count;
+            _cached.AsSpan((int)position, logicalCount).CopyTo(buffer);
+            return logicalCount;
         }
 
         if (position % Alignment != 0 || buffer.Length % Alignment != 0)
             throw new ArgumentException("Both position & buffer-size must be aligned to the cluster size!");
 
+        int workLength = (int)Math.Min(buffer.Length, AllocatedLength - position);
+
         int bytesPerUnit = GetBytesPerUnit();
         long remainingStart = position;
-        int remainingLength = buffer.Length;
+        int remainingLength = workLength;
         int bufferOffset = 0;
 
         NonResidentDataStream.SparseCheckState state = default;
@@ -87,15 +90,14 @@ public class CompressedDataStream : IDataStream
             int withinUnitOffset = (int)(remainingStart - unitByteOffset);
             int chunkLength = Math.Min(remainingLength, bytesPerUnit - withinUnitOffset);
 
-            ReadWithinOneUnit(unitByteOffset, withinUnitOffset, bytesPerUnit, buffer.Slice(bufferOffset, chunkLength),
-                ref state);
+            ReadWithinOneUnit(unitByteOffset, withinUnitOffset, bytesPerUnit, buffer.Slice(bufferOffset, chunkLength), ref state);
 
             remainingStart += chunkLength;
             bufferOffset += chunkLength;
             remainingLength -= chunkLength;
         }
 
-        return buffer.Length;
+        return logicalCount;
     }
 
     private int GetBytesPerUnit()

@@ -4,6 +4,8 @@ namespace Nternal.Ntfs.Attributes;
 
 public class ObjectIdAttribute : IParsableAttribute
 {
+    public static NtfsAttributeType AttributeType => NtfsAttributeType.ObjectId;
+
     public NtfsAttribute Underlying { get; init; } = null!;
 
     public Guid ObjectId { get; private set; }

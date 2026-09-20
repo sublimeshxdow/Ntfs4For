@@ -1,11 +1,16 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using Nternal.Attributes;
 using Nternal.Core.Streams;
+using Nternal.Extensions;
 using Nternal.Helpers;
 using Nternal.Ntfs;
 using Nternal.Ntfs.Attributes;
+using Nternal.Ntfs.Hashing;
 using Nternal.Ntfs.Index;
 using Nternal.Ntfs.Security;
 using Nternal.Structs;
@@ -109,7 +114,7 @@ namespace Nternal
 
             return sb.ToString();
         }
-        
+
         public NtfsFile GetNtfsFile(string path)
         {
             if (RootFolder == null)
@@ -187,6 +192,50 @@ namespace Nternal
             }
 
             return file;
+        }
+
+        public SecurityDescriptor? GetSecurityDescriptor(NtfsFile file)
+        {
+            var descriptor = file.GetAttributeData<SecurityDescriptorAttribute>("");
+            if (descriptor != null)
+                return descriptor.Descriptor;
+
+            var index = file.GetAttributeData<StandardInformationAttribute>()?.SecurityId;
+            return index != null ? LookupSecurityDescriptorByIndex(index.Value) : null;
+        }
+
+        private SecurityDescriptor? LookupSecurityDescriptorByIndex(uint securityId)
+        {
+            Span<byte> lookupKey = stackalloc byte[sizeof(uint)];
+            BinaryPrimitives.WriteUInt32LittleEndian(lookupKey, securityId);
+
+            var index = CreateIndexParser(SecureFile, "$SII");
+            var entry = index.TryFindRootEntry(lookupKey);
+            if (entry == null)
+                return null;
+
+            long offset = entry.GetData().ReadInt64(0x08);
+            int size = entry.GetData().ReadInt32(0x10);
+            const int headerOffset = 20;
+
+            var sdsStream = SecureFile.GetDataStream("$SDS");
+            Span<byte> sdsEntry = size <= 256 ? stackalloc byte[size] : new byte[size];
+            sdsStream.ReadExactly(offset, sdsEntry);
+            
+            // Let's see if the hash matches
+            Trace.Assert(sdsEntry.ReadUInt32(0x00) == SecurityHashing.HashSecurityDescriptor(sdsEntry[headerOffset..]));
+            
+            uint writtenSecurityId = sdsEntry.ReadUInt32(0x04);
+            long writtenOffset = sdsEntry.ReadInt64(0x08);
+            int writtenSize = sdsEntry.ReadInt32(0x10);
+
+            if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ValidateSdh)
+                && (securityId != writtenSecurityId || offset != writtenOffset || size != writtenSize))
+                throw new InvalidDataException(
+                    $"Invalid $Secure:$SDS stream - offset/length mismatch of entry with securityId {securityId}" +
+                    $"(IndexKeyOffset={offset}, IndexKeySize={size}, SdsEntryOffset={writtenOffset}, SdsEntrySize={writtenSize})!");
+
+            return new SecurityDescriptor(sdsEntry[headerOffset..]);
         }
 
         private RawFileRecord GetMftRecord(bool paranoid = true, bool fixup = true)
