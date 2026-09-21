@@ -221,10 +221,10 @@ namespace Nternal
             var sdsStream = SecureFile.GetDataStream("$SDS");
             Span<byte> sdsEntry = size <= 256 ? stackalloc byte[size] : new byte[size];
             sdsStream.ReadExactly(offset, sdsEntry);
-            
+
             // Let's see if the hash matches
             Trace.Assert(sdsEntry.ReadUInt32(0x00) == SecurityHashing.HashSecurityDescriptor(sdsEntry[headerOffset..]));
-            
+
             uint writtenSecurityId = sdsEntry.ReadUInt32(0x04);
             long writtenOffset = sdsEntry.ReadInt64(0x08);
             int writtenSize = sdsEntry.ReadInt32(0x10);

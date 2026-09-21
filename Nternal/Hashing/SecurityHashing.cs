@@ -5,15 +5,14 @@ namespace Nternal.Ntfs.Hashing;
 
 public class SecurityHashing
 {
-    public static uint HashSecurityDescriptor(ReadOnlySpan<byte> data)
+    public static uint HashSecurityDescriptor(ReadOnlySpan<byte> buffer)
     {
         uint hash = 0;
-        int dwordCount = data.Length >> 2;
-
-        for (int i = 0; i < dwordCount; i++)
+        while (buffer.Length >= 4)
         {
-            uint dword = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(i * 4, 4));
-            hash = BitOperations.RotateRight(hash, 0x1D) + dword;
+            hash = BitOperations.RotateRight(hash, 29);
+            hash += BinaryPrimitives.ReadUInt32LittleEndian(buffer);
+            buffer = buffer[4..];
         }
 
         return hash;
