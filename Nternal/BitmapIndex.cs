@@ -8,7 +8,7 @@ public class BitmapIndex
 {
     private ulong[]? _bitData;
     private long _pastLimit;
-    
+
     public void ReadBitmap(IDataStream accessor)
     {
         if (!BitConverter.IsLittleEndian)
@@ -19,6 +19,8 @@ public class BitmapIndex
         accessor.ReadExactly(0, data);
         _pastLimit = _bitData.LongLength * 64;
     }
+
+    public bool IsInRange(long index) => index >= 0 && index < _pastLimit;
 
     public bool IsSet(long index)
     {

@@ -19,21 +19,27 @@ namespace Nternal
 {
     public partial class NtfsVolume
     {
-        public RawFileRecord GetRawRecordData(FileReference reference, bool paranoid = true,
-            bool compareSequence = true, bool fixup = true, IDataStream? mft = null)
+        public RawFileRecord GetRawRecordData(FileReference reference, bool isAttributeLookup = false,
+            bool compareSequence = true, IDataStream? mft = null)
         {
             if (_hasParsedMftYet)
             {
-                var bitmapAttr = MftFile.GetAttributeData<BitmapAttribute>(NtfsAttributeType.Bitmap, "");
-                if (bitmapAttr == null)
-                    throw new InvalidOperationException(
-                        $"$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
+                if (MftBitmap == null)
+                {
+                    MftBitmap = MftFile!.GetAttributeData<BitmapAttribute>("");
+                    if (MftBitmap == null)
+                        throw new InvalidOperationException(
+                            $"$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
+                }
 
-                if (!bitmapAttr.IsSet((long)reference.FileRecordId))
+                if (!MftBitmap.IsInRange((long)reference.FileRecordId))
+                    throw new Exception($"Attempted to parse an $Mft-Record! outside the valid range!");
+
+                if (!MftBitmap.IsSet((long)reference.FileRecordId))
                     throw new Exception($"Attempted to parse an unused $Mft-Record!");
             }
 
-            var mftStream = mft ?? MftFile.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "").GetStream();
+            var mftStream = mft ?? MftFile!.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "")?.GetStream();
             if (mftStream == null)
                 throw new InvalidOperationException(
                     $"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
@@ -46,13 +52,17 @@ namespace Nternal
             mftStream.ReadExactly(clusterWithRecord * BootSector.BytesPerCluster, fileRecordCluster);
             Span<byte> fileRecord = fileRecordCluster[recordOffset..(recordOffset + BootSector.FileRecordSize)];
 
-            if (fixup)
-                FixupHelper.FixupRecord(fileRecord);
+            FixupHelper.FixupRecord(fileRecord);
 
             var rawRecord = new RawFileRecord(fileRecord);
             if (compareSequence && rawRecord.SequenceNumber != reference.SequenceNumber)
-                throw new ArgumentException(
-                    $"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!");
+            {
+                string msg = $"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!";
+                if (isAttributeLookup)
+                    msg += "\nThis happened during an attribute lookup. Ensure the volume is not corrupted, and that the volume was opened locking!";
+
+                throw new ArgumentException(msg);
+            }
 
             return rawRecord;
         }
@@ -82,7 +92,7 @@ namespace Nternal
 
         public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
         {
-            var rawRecord = GetRawRecordData(reference, true, compareSequence, true);
+            var rawRecord = GetRawRecordData(reference, isAttributeLookup: false, compareSequence: compareSequence);
             return new NtfsFile(rawRecord, _provider, this, true);
         }
 

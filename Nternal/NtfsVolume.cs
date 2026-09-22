@@ -13,6 +13,8 @@ using Nternal.Ntfs.Checksum;
 using Nternal.Ntfs.Index;
 using Nternal.Ntfs.NtfsExtensions.Journal;
 using Nternal.Structs;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace Nternal
 {
@@ -25,6 +27,13 @@ namespace Nternal
         public FixupHelper FixupHelper { get; private set; }
         public CollationHandler CollationHandler { get; private set; }
 
+        private DataRun[] _cachedBadRanges;
+        private BitmapAttribute _rawClusterMap;
+
+        public NtfsFile VolumeClusterFile { get; private set; }
+        public NtfsFile RootFolder { get; private set; }
+        public NtfsFile SecureFile { get; private set; }
+
         public NtfsVolume(IDataStream dataProvider)
         {
             _provider = dataProvider;
@@ -35,8 +44,10 @@ namespace Nternal
             CollationHandler = new();
             ParseBootSector();
             ParseMft();
+
             if (MftFile == null)
                 throw new Exception("Failed to parse the Mft..?");
+            MftFile.GetAttributeData<DataAttribute>("").GetStream().LoadIntoMemory();
 
             VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Volume);
             RootFolder = GetKnownNtfsFile(KnownMftRecord.Root);
@@ -164,9 +175,10 @@ namespace Nternal
         internal IDataStream GetUnderlyingStream() => _provider;
 
         private bool _hasParsedMftYet = false;
-        private IDataStream? _mftStream = null;
 
         public NtfsFile? MftFile { get; private set; }
+        public BitmapIndex? MftBitmap { get; private set; }
+
         public NtfsFile? UpcaseFile { get; private set; }
 
         public NtfsFile? VolumeBitmapFile { get; private set; }
@@ -197,14 +209,5 @@ namespace Nternal
                 return _rawClusterMap;
             }
         }
-
-        private DataRun[]? _cachedBadRanges;
-        private BitmapAttribute? _rawClusterMap;
-
-        public NtfsFile? VolumeClusterFile { get; private set; }
-
-        public NtfsFile? RootFolder { get; private set; }
-
-        public NtfsFile SecureFile { get; private set; }
     }
 }
