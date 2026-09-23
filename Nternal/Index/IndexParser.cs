@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Text;
 using Nternal.Attributes;
+using Nternal.Core.Streams;
 using Nternal.Extensions;
 using Nternal.Helpers;
 using Nternal.Ntfs.Attributes;
+using Nternal.Streams;
 using Nternal.Structs;
 
 namespace Nternal.Ntfs.Index;
@@ -19,7 +21,10 @@ public class IndexParser
     internal readonly CollationHandler CollationHandler;
     internal readonly FixupHelper FixupHelper;
 
-    public IndexParser(NtfsFile file, string index, CollationHandler handler, FixupHelper helper)
+    private readonly NtfsBootSector BootSector;
+    private readonly IDataStream UnalignedIndexAllocationStream;
+
+    public IndexParser(NtfsFile file, string index, CollationHandler handler, FixupHelper helper, NtfsBootSector bootSector)
     {
         IndexRoot = file.GetAttributeData<IndexRootAttribute>(NtfsAttributeType.IndexRoot, index) ??
                     throw new ArgumentException($"Index \"{index}\" could not be found in file {file.GetReference()}!");
@@ -29,10 +34,15 @@ public class IndexParser
         Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing);
         CollationHandler = handler;
         FixupHelper = helper;
+
+        BootSector = bootSector;
+
+        if (IndexAllocation != null)
+            UnalignedIndexAllocationStream = new UnalignedDataStream(IndexAllocation.GetStream());
     }
 
     public IndexParser(IndexRootAttribute root, IndexAllocationAttribute? allocation, BitmapAttribute? bitmap,
-        CollationHandler handler, FixupHelper helper)
+        CollationHandler handler, FixupHelper helper, NtfsBootSector bootSector)
     {
         IndexRoot = root;
         IndexAllocation = allocation;
@@ -40,6 +50,10 @@ public class IndexParser
         Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing);
         CollationHandler = handler;
         FixupHelper = helper;
+        BootSector = bootSector;
+
+        if (IndexAllocation != null)
+            UnalignedIndexAllocationStream = new UnalignedDataStream(IndexAllocation.GetStream());
     }
 
     public IndexEntry? TryFindRootEntry(ReadOnlySpan<byte> key)
@@ -111,15 +125,15 @@ public class IndexParser
 
     private byte[]? GetIndexBuffer(long node)
     {
-        if (IndexAllocation == null || Bitmap == null)
-            return null;
+        long byteOffset = node * (IndexRoot.ChildVcnInSectorUnits ? BootSector.BytesPerSector : BootSector.BytesPerCluster);
+        long bitmapBit = byteOffset / IndexRoot.BytesPerIndexBlock;
 
-        if (!Bitmap.IsSet(node))
+        if (!Bitmap.IsSet(bitmapBit))
             if (Paranoid) throw new Exception("A free sub-node was specified within an index entry!");
             else return null;
 
         byte[] indexBuffer = new byte[IndexRoot.BytesPerIndexBlock];
-        IndexAllocation.GetStream().ReadExactly(node * indexBuffer.Length, indexBuffer);
+        UnalignedIndexAllocationStream.ReadExactly(byteOffset, indexBuffer);
         FixupHelper.FixupRecord(indexBuffer);
 
         int offset = 0x18 + indexBuffer.AsSpan().ReadUInt16(0x18);
@@ -129,10 +143,11 @@ public class IndexParser
     private IndexEntry? TryFindAllocationEntry(long node, ReadOnlySpan<byte> key)
     {
         // We do not have a valid index-allocation => null
-        if (IndexAllocation == null || Bitmap == null)
-            return null;
+        var buffer = GetIndexBuffer(node);
+        if (buffer == null)
+            return null; // or throw, if Paranoid should have already caught this upstream
 
-        return LookInIndexTree(GetIndexBuffer(node), key);
+        return LookInIndexTree(buffer, key);
     }
 
     private IndexEntry? LookInIndexTree(ReadOnlySpan<byte> bufferData, ReadOnlySpan<byte> key)

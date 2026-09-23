@@ -44,8 +44,9 @@ namespace Nternal
                 throw new InvalidOperationException(
                     $"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
 
-            long clusterWithRecord = (long)reference.FileRecordId / 4;
-            int index = (int)(reference.FileRecordId % 4);
+            int recordsPerCluster = BootSector.BytesPerCluster / BootSector.FileRecordSize;
+            long clusterWithRecord = (long)reference.FileRecordId / recordsPerCluster;
+            int index = (int)(reference.FileRecordId % (ulong)recordsPerCluster);
             int recordOffset = index * BootSector.FileRecordSize;
 
             Span<byte> fileRecordCluster = new byte[BootSector.BytesPerCluster];
@@ -94,6 +95,11 @@ namespace Nternal
         {
             var rawRecord = GetRawRecordData(reference, isAttributeLookup: false, compareSequence: compareSequence);
             return new NtfsFile(rawRecord, _provider, this, true);
+        }
+
+        public long GetMftRecordCount()
+        {
+            return MftFile!.GetDataStream().Length / BootSector.FileRecordSize;
         }
 
         public string GetPrimaryAbsolutePath(FileReference reference)
@@ -263,6 +269,6 @@ namespace Nternal
         }
 
         public IndexParser CreateIndexParser(NtfsFile file, string index) =>
-            new IndexParser(file, index, CollationHandler, FixupHelper);
+            new IndexParser(file, index, CollationHandler, FixupHelper, BootSector);
     }
 }

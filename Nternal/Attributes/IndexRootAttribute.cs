@@ -21,8 +21,11 @@ public class IndexRootAttribute : IParsableAttribute
 
     public NtfsAttributeType IndexedType { get; private set; }
     public CollationRules CollationRule { get; private set; }
-    public uint IndexBlockSize { get; private set; }
     public int BytesPerIndexBlock { get; private set; }
+
+    public int IndexBlockSize { get; private set; }
+    public bool ChildVcnInSectorUnits { get; private set; }
+
     public int OffsetToFirstEntry { get; private set; }
     public uint BytesInUse { get; private set; }
     public uint BytesAllocated { get; private set; }
@@ -42,8 +45,10 @@ public class IndexRootAttribute : IParsableAttribute
 
         IndexedType = (NtfsAttributeType)buffer.ReadUInt32(0);
         CollationRule = (CollationRules)buffer.ReadUInt32(4);
-        IndexBlockSize = buffer.ReadUInt32(8);
-        BytesPerIndexBlock = RawOrLogEncoding.ResolveSize(unchecked((sbyte)buffer[12]), Underlying.BytesPerCluster);
+        BytesPerIndexBlock = buffer.ReadInt32(8);
+        
+        //BytesPerIndexBlock = RawOrLogEncoding.ResolveSize(unchecked((sbyte)buffer[12]), Underlying.BytesPerCluster);
+        ChildVcnInSectorUnits = BytesPerIndexBlock < Underlying.BytesPerCluster;
 
         OffsetToFirstEntry = buffer.ReadInt32(16);
         BytesInUse = buffer.ReadUInt32(20);
