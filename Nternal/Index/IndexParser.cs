@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text;
 using Nternal.Attributes;
@@ -132,19 +133,19 @@ public class IndexParser
             if (Paranoid) throw new Exception("A free sub-node was specified within an index entry!");
             else return null;
 
-        byte[] indexBuffer = new byte[IndexRoot.BytesPerIndexBlock];
+        Span<byte> indexBuffer = new byte[IndexRoot.BytesPerIndexBlock];
         UnalignedIndexAllocationStream.ReadExactly(byteOffset, indexBuffer);
 
         string magicNumber;
-        if ((magicNumber = Encoding.ASCII.GetString(indexBuffer, 0, 4)) != IndexAllocationAttribute.ExpectedSignature)
+        if ((magicNumber = indexBuffer.ReadAsciiString(0, 4)) != IndexAllocationAttribute.ExpectedMagicNumber)
             throw new InvalidDataException($"Index-Buffer {node} has an invalid magic number ({magicNumber}, " +
-                $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
-
+                $"expected \"{IndexAllocationAttribute.ExpectedMagicNumber}\")!");
 
         FixupHelper.FixupRecord(indexBuffer);
 
-        int offset = 0x18 + indexBuffer.AsSpan().ReadUInt16(0x18);
-        return indexBuffer.AsSpan(offset).ToArray();
+        int offset = 0x18 + indexBuffer.ReadUInt16(0x18);
+        int length = indexBuffer.ReadInt32(0x1C);
+        return indexBuffer[offset..(offset + length)].ToArray();
     }
 
     private IndexEntry? TryFindAllocationEntry(long node, ReadOnlySpan<byte> key)

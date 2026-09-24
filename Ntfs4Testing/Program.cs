@@ -24,10 +24,20 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        var stream = new Win32PartitionStream(@"\\.\N:", long.MaxValue);
+        char[] letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'N'];
+
+        Parallel.ForEach(letters, letter =>
+        {
+            CheckDriveLetter(letter);
+        });
+    }
+
+    static void CheckDriveLetter(char letter)
+    {
+        var stream = new Win32PartitionStream($@"\\.\{letter}:", long.MaxValue);
         //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
-        NtfsVolume v = new(stream);
+        using NtfsVolume v = new(stream);
         v.Mount();
 
         //NtfsPolicyConfig.PolicyFlags ^= NtfsPolicyConfig.Flags.ValidateSequenceNumbers;
@@ -37,27 +47,32 @@ internal class Program
         Stopwatch s = new();
         s.Start();
 
+        long errors = 0;
+
         for (long l = 0; l < v.GetMftRecordCount(); l++)
         {
             try
             {
                 var test = v.GetNtfsFile(new FileReference((ulong)l, 0), false);
 
-                Interlocked.Add(ref processed, 1);
+                //Interlocked.Add(ref processed, 1);
 
-                if (processed % 100000 == 0)
-                    Console.WriteLine(processed);
+                //if (processed % 100000 == 0)
+                //    Console.WriteLine(processed);
             }
 
             catch (Exception ex)
             {
                 if (!ex.Message.Contains("unused"))
-                    Console.WriteLine($"{l} - {ex.Message}");
+                {
+                    Console.WriteLine($@"\\.\{letter}: {l} - {ex.Message}");
+                    errors++;
+                }
             }
         }
 
         s.Stop();
-        Console.WriteLine(s.Elapsed.TotalMilliseconds);
+        Console.WriteLine($@"\\.\{letter}: Completed with {v.GetMftRecordCount()} records, after {s.Elapsed.TotalMilliseconds}ms, with {errors} unexpected errors!");
 
         //var file = v.GetNtfsFile($"/Users/xxluk/AppData/Local/Microsoft/IdentityCache/1/UD/u_B9UEQH0F44PUHL59/e_C2GK9UTC67FSUCG3/ID/r_74DB6FURNR2TGPBK/c_6HM880EG8H6C0PCE.bin");
         //var sdh = v.GetSecurityDescriptor(file);

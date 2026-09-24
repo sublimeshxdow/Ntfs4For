@@ -18,7 +18,7 @@ using System.Runtime.CompilerServices;
 
 namespace Nternal
 {
-    public partial class NtfsVolume
+    public sealed partial class NtfsVolume : IDisposable
     {
         private IDataStream _provider;
 
@@ -37,7 +37,14 @@ namespace Nternal
             _provider = dataProvider;
         }
 
-        public void Mount()
+        public void Dispose()
+        {
+            var mftStream = MftFile!.GetAttributeData<DataAttribute>("")!.GetStream();
+            mftStream.Dispose();
+            Console.WriteLine("Disposed!");
+        }
+
+        public void Mount(bool loadMftIntoMemory = true)
         {
             CollationHandler = new();
             ParseBootSector();
@@ -45,7 +52,12 @@ namespace Nternal
 
             if (MftFile == null)
                 throw new Exception("Failed to parse the Mft..?");
-            MftFile.GetAttributeData<DataAttribute>("").GetStream().LoadIntoMemory();
+
+            if (loadMftIntoMemory)
+            {
+                var mftStream = MftFile.GetAttributeData<DataAttribute>("")!.GetStream();
+                mftStream.LoadIntoMemory();
+            }
 
             VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Volume);
             RootFolder = GetKnownNtfsFile(KnownMftRecord.Root);

@@ -39,6 +39,9 @@ namespace Nternal.Attributes
                     break;
 
                 RawAttributeHeader header = MemoryMarshal.Cast<byte, RawAttributeHeader>(attributeBuffer)[0];
+                if (header.Length == 0)
+                    throw new InvalidDataException($"Encountered an attribute header with a length of zero - this may never happen on a healthy volume!");
+
                 string name =
                     Encoding.Unicode.GetString(attributeBuffer.Slice(header.NameOffset, header.NameLength * 2));
 
@@ -164,12 +167,8 @@ namespace Nternal.Attributes
             }
         }
 
-        private NtfsAttribute? GetMatchingAttribute(RawNonResidentAttributeHeader header, string name)
-        {
-            return NtfsAttributes
-                .Where(x => x.Source.Id == header.Common.AttributeId)
-                .FirstOrDefault();
-        }
+        private NtfsAttribute? GetMatchingAttribute(RawNonResidentAttributeHeader header, string name) =>
+            NtfsAttributes.FirstOrDefault(x => x.IsNonResident && x.Type == header.Common.Type && x.Name == name);
 
         private void ProcessAttributeListIfPresent()
         {
@@ -200,6 +199,22 @@ namespace Nternal.Attributes
 
                 throw new Exception($"Merge resulted in {produced} attribute entries (seperating extents), " +
                     $"but it should be {expected}!");
+
+            }
+
+            foreach (var group in NtfsAttributes.Where(a => a.IsNonResident).GroupBy(a => (a.Type, a.Name)))
+            {
+                if (group.Count() > 1)
+                    throw new InvalidDataException($"Attribute {group.Key} was split into {group.Count()} parts!");
+
+                var extents = ((NonResidentDataStream)group.Single().Accessor).Extents;
+                extents.Sort((a, b) => a.LowestVcn.CompareTo(b.LowestVcn));
+
+                if (extents[0].LowestVcn != 0)
+                    throw new InvalidDataException($"Attribute {group.Key} has no extent at VCN 0!");
+                for (int i = 1; i < extents.Count; i++)
+                    if (extents[i].LowestVcn != extents[i - 1].HighestVcn + 1)
+                        throw new InvalidDataException($"Attribute {group.Key} has a gap or overlap at extent {i}!");
             }
         }
     }

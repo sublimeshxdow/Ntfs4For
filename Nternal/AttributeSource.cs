@@ -5,5 +5,5 @@ using System.Text;
 
 namespace Nternal.Ntfs
 {
-    public readonly record struct AttributeSource(FileReference BaseReference, ushort Id);
+    public readonly record struct AttributeSource(FileReference Record, ushort Id);
 }

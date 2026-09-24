@@ -9,17 +9,19 @@ public class UnalignedDataStream : IDataStream
     public int Alignment => 1;
 
     private IDataStream _source { get; }
+    private bool _leaveOpen;
 
-    public UnalignedDataStream(IDataStream underlying)
+    public UnalignedDataStream(IDataStream underlying, bool leaveOpen = false)
     {
         _source = underlying;
+        _leaveOpen = leaveOpen;
     }
 
     public void LoadIntoMemory()
     {
         _source.LoadIntoMemory();
     }
-    
+
     public int Read(long position, Span<byte> buffer)
     {
         if (buffer.Length == 0)
@@ -42,7 +44,7 @@ public class UnalignedDataStream : IDataStream
         alignedRead.Slice(offsetWithinFirstBlock, available).CopyTo(buffer);
         return available;
     }
-    
+
     public void ReadExactly(long position, Span<byte> buffer)
     {
         if (Read(position, buffer) != buffer.Length)
@@ -56,6 +58,7 @@ public class UnalignedDataStream : IDataStream
 
     public void Dispose()
     {
-        throw new NotImplementedException();
+        if (!_leaveOpen)
+            _source.Dispose();
     }
 }

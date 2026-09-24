@@ -44,6 +44,8 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file, bool isMft)
                 break;
 
             RawAttributeHeader header = MemoryMarshal.Cast<byte, RawAttributeHeader>(attributeBuffer)[0];
+            if (header.Length == 0)
+                throw new InvalidDataException($"Encountered an attribute header with a length of zero - this may never happen on a healthy volume!");
 
             if (entry.Id != header.AttributeId)
             {
@@ -81,7 +83,7 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file, bool isMft)
 
     private void MergeResidentAttribute(RawResidentAttributeHeader header, AttributeListAttribute.Entry entry, ReadOnlySpan<byte> data)
     {
-        if (IsAttributePresent(header, entry))
+        if (IsInstancePresent(entry.BaseFileReference, entry.Id))
             return;
 
         // Life is easy - we simply append the attribute to our file, if it's not present yet
@@ -100,10 +102,11 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file, bool isMft)
 
     private void MergeNonResidentAttribute(RawNonResidentAttributeHeader header, AttributeListAttribute.Entry entry, ReadOnlySpan<byte> dataruns)
     {
-        if (IsAttributePresent(header, entry))
+        if (IsInstancePresent(entry.BaseFileReference, entry.Id))
             return;
 
         var extent = RunHelpers.GetExtentOfNrh(header, dataruns);
+        extent.Source = new(entry.BaseFileReference, header.Common.AttributeId);
 
         var matchingAttribute = GetMatchingAttribute(header, entry);
         if (matchingAttribute != null)
@@ -135,29 +138,17 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file, bool isMft)
         }
     }
 
-    private bool IsAttributePresent(RawResidentAttributeHeader header, AttributeListAttribute.Entry entry)
-    { 
-        return _file.NtfsAttributes
-            .Where(x => x.Source.Id == header.Common.AttributeId)
-            .Where(x => x.Source.BaseReference == entry.BaseFileReference)
-            .FirstOrDefault() != null;
-    }
-
-    private bool IsAttributePresent(RawNonResidentAttributeHeader header, AttributeListAttribute.Entry entry)
-    {
-        return _file.NtfsAttributes
-            .Where(x => x.Source.Id == header.Common.AttributeId)
-            .Where(x => x.Source.BaseReference == entry.BaseFileReference)
-            .FirstOrDefault() != null;
-        //.Where(x => ((NonResidentDataStream)x.Accessor).Extents.Any(x => x.LowestVcn == header.StartingVcn))
-        //.FirstOrDefault(x => x.Name == entry.Name) != null;
-    }
+    private bool IsInstancePresent(FileReference record, ushort id) =>
+        _file.NtfsAttributes.Any(a => a.IsNonResident
+            ? ((NonResidentDataStream)a.Accessor).Extents.Any(e => e.Source.Record == record && e.Source.Id == id)
+            : a.ResidentSource is { } s && s.Record == record && s.Id == id);
 
     private NtfsAttribute? GetMatchingAttribute(RawNonResidentAttributeHeader header, AttributeListAttribute.Entry entry)
     {
         return _file.NtfsAttributes
-            .Where(x => x.Type == header.Common.Type)
-            .Where(x => x.Source.BaseReference == entry.BaseFileReference)
-            .FirstOrDefault();
+                .FirstOrDefault(x => x.IsNonResident
+                    && x.Type == header.Common.Type
+                    && x.Name == entry.Name);
+
     }
 }
