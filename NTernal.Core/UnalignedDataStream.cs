@@ -1,6 +1,6 @@
 using Nternal.Core.Streams;
 
-namespace Nternal.Streams;
+namespace Nternal.Core;
 
 public class UnalignedDataStream : IDataStream
 {

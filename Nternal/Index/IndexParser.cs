@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text;
 using Nternal.Attributes;
+using Nternal.Core;
 using Nternal.Core.Streams;
 using Nternal.Extensions;
 using Nternal.Helpers;

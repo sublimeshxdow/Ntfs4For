@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Transactions;
 using Nternal.Attributes;
+using Nternal.Core;
 using Nternal.Core.Streams;
 using Nternal.Helpers;
 using Nternal.Internal;

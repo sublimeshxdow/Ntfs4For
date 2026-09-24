@@ -34,7 +34,7 @@ internal class Program
 
     static void CheckDriveLetter(char letter)
     {
-        var stream = new Win32PartitionStream($@"\\.\{letter}:", long.MaxValue);
+        var stream = new Win32PartitionStream($@"\\.\{letter}:");
         //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         using NtfsVolume v = new(stream);
@@ -74,7 +74,7 @@ internal class Program
         s.Stop();
         Console.WriteLine($@"\\.\{letter}: Completed with {v.GetMftRecordCount()} records, after {s.Elapsed.TotalMilliseconds}ms, with {errors} unexpected errors!");
 
-        //var file = v.GetNtfsFile($"/Users/xxluk/AppData/Local/Microsoft/IdentityCache/1/UD/u_B9UEQH0F44PUHL59/e_C2GK9UTC67FSUCG3/ID/r_74DB6FURNR2TGPBK/c_6HM880EG8H6C0PCE.bin");
-        //var sdh = v.GetSecurityDescriptor(file);
+        var file = v.GetNtfsFile($"/$Mft");
+        var sdh = v.GetSecurityDescriptor(file);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32.SafeHandles;
 using Nternal.Core.Streams;
+using System.Diagnostics;
 
 namespace Nternal.Core
 {
@@ -9,9 +10,16 @@ namespace Nternal.Core
 
         public long Length { get; }
         public long AllocatedLength { get; }
-        public int Alignment => 512;
+        public int Alignment { get; }
 
-        public Win32PartitionStream(string devicePath, long length)
+        /// <summary>
+        /// For cases where the logical partition sector size is larger than the logical physical sector size
+        /// (f.e. HDDs without 512e support)
+        /// </summary>
+        /// <returns></returns>
+        private UnalignedDataStream FallbackAlignerStream { get; }
+
+        public Win32PartitionStream(string devicePath)
         {
             _handle = File.OpenHandle(
                 devicePath,
@@ -20,17 +28,28 @@ namespace Nternal.Core
                 FileShare.ReadWrite | FileShare.Delete,
                 FileOptions.RandomAccess);
 
-            Length = length;
-            AllocatedLength = length;
+            var sizes = DiskInfo.GetSectorSizes(devicePath);
+            Alignment = (int)sizes.Logical;
+
+            Length = DiskInfo.GetLength(_handle);
+            AllocatedLength = Length;
+
+            FallbackAlignerStream = new(this);
         }
 
         public void LoadIntoMemory()
         {
-            throw new NotImplementedException();
+            throw new NotSupportedException($"Reading an entire drive into memory is NOT supported!");
         }
 
         public int Read(long position, Span<byte> buffer)
         {
+            if (position % Alignment != 0 || buffer.Length % Alignment != 0)
+            {
+                Debugger.Break();
+                return FallbackAlignerStream.Read(position, buffer);
+            }
+
             if (position < 0 || position > Length)
                 throw new ArgumentOutOfRangeException(nameof(position));
 
@@ -45,6 +64,13 @@ namespace Nternal.Core
 
         public void ReadExactly(long position, Span<byte> buffer)
         {
+            if (position % Alignment != 0 || buffer.Length % Alignment != 0)
+            {
+                Debugger.Break();
+                FallbackAlignerStream.Read(position, buffer);
+                return;
+            }
+
             int totalRead = 0;
 
             while (totalRead < buffer.Length)
