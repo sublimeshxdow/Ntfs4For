@@ -1,4 +1,5 @@
 ﻿using Nternal.Core.Streams;
+using Nternal.Ntfs;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -20,6 +21,7 @@ namespace Nternal.Streams
         public long LowestVcn { get; set; }
         public long HighestVcn { get; set; }
         public List<DataRun> DataRuns { get; set; } = [];
+        public AttributeSource Source { get; set; }
 
         public ushort CompressionUnitSize { get; set; }
         public long? AllocatedSize { get; set; }

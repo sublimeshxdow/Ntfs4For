@@ -44,7 +44,7 @@ namespace Nternal.Attributes
                 Entries.Add(new Entry()
                 {
                     BaseFileReference = baseFileReference,
-                    AttributeId = attributeId,
+                    Id = attributeId,
                     Type = type,
                     Name = name,
                     LowestVcn = lowestLcn
@@ -58,7 +58,7 @@ namespace Nternal.Attributes
         {
             public FileReference BaseFileReference { get; init; }
 
-            public ushort AttributeId { get; init; }
+            public ushort Id { get; init; }
             public NtfsAttributeType Type { get; init; }
             public string Name { get; init; }
             public long LowestVcn { get; init; }

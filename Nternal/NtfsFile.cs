@@ -1,4 +1,9 @@
-﻿using Nternal.Internal;
+﻿using Nternal.Core.Streams;
+using Nternal.Helpers;
+using Nternal.Internal;
+using Nternal.Ntfs;
+using Nternal.Ntfs.Attributes;
+using Nternal.Ntfs.Helpers;
 using Nternal.Streams;
 using Nternal.Structs;
 using System;
@@ -6,11 +11,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
-using Nternal.Core.Streams;
-using Nternal.Helpers;
-using Nternal.Ntfs;
-using Nternal.Ntfs.Attributes;
-using Nternal.Ntfs.Helpers;
+using static System.Net.WebRequestMethods;
 
 namespace Nternal.Attributes
 {
@@ -119,7 +120,7 @@ namespace Nternal.Attributes
                 Type = header.Common.Type,
                 IsNonResident = false,
                 Flags = header.Common.Flags,
-                Id = header.Common.AttributeId,
+                ResidentSource = new(GetReference(), header.Common.AttributeId),
                 Name = name,
 
                 Accessor = new ResidentDataStream(data.ToArray()),
@@ -131,6 +132,7 @@ namespace Nternal.Attributes
             ReadOnlySpan<byte> dataruns, IDataStream underlying)
         {
             var extent = RunHelpers.GetExtentOfNrh(header, dataruns);
+            extent.Source = new(GetReference(), header.Common.AttributeId);
 
             var matchingAttribute = GetMatchingAttribute(header, name);
             if (matchingAttribute != null)
@@ -151,7 +153,6 @@ namespace Nternal.Attributes
                     Type = header.Common.Type,
                     IsNonResident = true,
                     Flags = header.Common.Flags,
-                    Id = header.Common.AttributeId,
                     Name = name,
 
                     Accessor = new NonResidentDataStream(underlying, _ntfsVolume.BootSector.BytesPerCluster),
@@ -166,9 +167,8 @@ namespace Nternal.Attributes
         private NtfsAttribute? GetMatchingAttribute(RawNonResidentAttributeHeader header, string name)
         {
             return NtfsAttributes
-                .Where(x => x.Type == header.Common.Type)
-                .Where(x => x.Id == header.Common.AttributeId)
-                .FirstOrDefault(x => x.Name == name);
+                .Where(x => x.Source.Id == header.Common.AttributeId)
+                .FirstOrDefault();
         }
 
         private void ProcessAttributeListIfPresent()
@@ -178,11 +178,29 @@ namespace Nternal.Attributes
                 return;
 
             var data = attributeList.Cast<AttributeListAttribute>();
-            data.ParseFromAccessor(true);
-
             FileRecordMerger merger = new(_ntfsVolume, this, _ntfsVolume.MftFile == null);
             foreach (var entry in data.Entries)
                 merger.MergeListedEntry(entry);
+
+            int produced = NtfsAttributes.Sum(a =>
+                a.IsNonResident ? ((NonResidentDataStream)a.Accessor).Extents.Count : 1);
+            int expected = data.Entries.Count + 1;
+
+            // Be aware, $AttributeList does not list itself!
+            if (produced < expected)
+            {
+#if DEBUG
+                StringBuilder _produced = new();
+                foreach (var entry in NtfsAttributes)
+                    if (!entry.IsNonResident)
+                        Console.WriteLine($"Present - Resident - {entry.Type}, {entry.Source.Id}, {entry.Name}");
+                foreach (var entry in data.Entries)
+                    Console.WriteLine($"Listed - Resident - {entry.Type}, {entry.Id}, {entry.Name}");
+#endif
+
+                throw new Exception($"Merge resulted in {produced} attribute entries (seperating extents), " +
+                    $"but it should be {expected}!");
+            }
         }
     }
 }

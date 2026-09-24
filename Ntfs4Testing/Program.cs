@@ -24,7 +24,7 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        var stream = new Win32PartitionStream(@"\\.\C:", long.MaxValue);
+        var stream = new Win32PartitionStream(@"\\.\N:", long.MaxValue);
         //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
 
         NtfsVolume v = new(stream);
@@ -37,7 +37,7 @@ internal class Program
         Stopwatch s = new();
         s.Start();
 
-        Parallel.For(0, v.GetMftRecordCount(), (l) =>
+        for (long l = 0; l < v.GetMftRecordCount(); l++)
         {
             try
             {
@@ -54,12 +54,12 @@ internal class Program
                 if (!ex.Message.Contains("unused"))
                     Console.WriteLine($"{l} - {ex.Message}");
             }
-        });
+        }
 
         s.Stop();
         Console.WriteLine(s.Elapsed.TotalMilliseconds);
 
-        var file = v.GetNtfsFile($"/Users/xxluk/AppData/Local/Microsoft/IdentityCache/1/UD/u_B9UEQH0F44PUHL59/e_C2GK9UTC67FSUCG3/ID/r_74DB6FURNR2TGPBK/c_6HM880EG8H6C0PCE.bin");
-        var sdh = v.GetSecurityDescriptor(file);
+        //var file = v.GetNtfsFile($"/Users/xxluk/AppData/Local/Microsoft/IdentityCache/1/UD/u_B9UEQH0F44PUHL59/e_C2GK9UTC67FSUCG3/ID/r_74DB6FURNR2TGPBK/c_6HM880EG8H6C0PCE.bin");
+        //var sdh = v.GetSecurityDescriptor(file);
     }
 }
