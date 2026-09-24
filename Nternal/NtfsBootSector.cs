@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 using Nternal.Ntfs.Utils.DecodingUtils;
 
@@ -29,7 +30,7 @@ namespace Nternal
         public ushort BytesPerSector { get; }
 
         /// <summary>Sectors per cluster (power of two: 1, 2, 4, ... 128).</summary>
-        public byte SectorsPerCluster { get; }
+        public int SectorsPerCluster { get; }
 
         /// <summary>Reserved sectors before the volume proper begins. Always 0 for NTFS.</summary>
         public ushort ReservedSectors { get; }
@@ -102,7 +103,12 @@ namespace Nternal
             OemId = Encoding.ASCII.GetString(sector[0x03..0x0B]);                                    // 8 bytes
 
             BytesPerSector = BinaryPrimitives.ReadUInt16LittleEndian(sector[0x0B..]);                // 2 bytes
-            SectorsPerCluster = sector[0x0D];                                                        // 1 byte
+
+            byte rawSectorsPerCluster = sector[0x0D];                                                              // 1 byte
+            SectorsPerCluster = rawSectorsPerCluster <= 0x80 ? rawSectorsPerCluster : 1 << (256 - rawSectorsPerCluster);   // make it an int
+            if (SectorsPerCluster < 0 || BitOperations.PopCount((uint)SectorsPerCluster) != 1)
+                throw new InvalidDataException($"SectorsPerCluster must be positive, and a power of two, but got {SectorsPerCluster}!");
+
             ReservedSectors = BinaryPrimitives.ReadUInt16LittleEndian(sector[0x0E..]);               // 2 bytes (always 0 for NTFS)
             MediaDescriptor = sector[0x15];                                                          // 1 byte
             SectorsPerTrack = BinaryPrimitives.ReadUInt16LittleEndian(sector[0x18..]);                // 2 bytes
@@ -111,7 +117,7 @@ namespace Nternal
 
             TotalSectors = BinaryPrimitives.ReadInt64LittleEndian(sector[0x28..]);                    // 8 bytes (signed)
             TotalClusters = TotalSectors / SectorsPerCluster;
-            
+
             MftClusterNumber = BinaryPrimitives.ReadInt64LittleEndian(sector[0x30..]);                // 8 bytes (signed)
             MftMirrClusterNumber = BinaryPrimitives.ReadInt64LittleEndian(sector[0x38..]);            // 8 bytes (signed)
 

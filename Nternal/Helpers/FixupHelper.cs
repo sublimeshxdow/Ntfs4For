@@ -3,42 +3,36 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Nternal.Helpers
 {
-    public class FixupHelper
+    internal static class FixupHelper
     {
+        const int SequenceNumberStride = 512;
+
         public class NtfsFixupException : Exception
         {
             public NtfsFixupException(string message = "") : base(message) { }
         }
 
-        public readonly ushort BytesPerSector;
-        
-        public FixupHelper(ushort bytesPerSector)
+        public static void FixupRecord(Span<byte> record)
         {
-            BytesPerSector = bytesPerSector;
-        }
+            ushort usaOffset = BinaryPrimitives.ReadUInt16LittleEndian(record[0x04..]);
+            ushort usaEntryCount = BinaryPrimitives.ReadUInt16LittleEndian(record[0x06..]);
 
-        public void FixupRecord(Span<byte> record)
-        {
-            // Confirmed this is the case for both $Mft-Records & Index-Buffers
-            ushort offsetToUs = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(0x04, 0x02));
-            ushort sizeOfUsa = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(0x06, 0x02));
+            if (usaEntryCount < 2 || (usaEntryCount - 1) * SequenceNumberStride != record.Length
+                || usaOffset + usaEntryCount * 2 > SequenceNumberStride - 2 || (usaOffset & 1) != 0)
+                throw new NtfsFixupException("Malformed update sequence array!");
 
-            ushort usn = BinaryPrimitives.ReadUInt16LittleEndian(record.Slice(offsetToUs, 2));
-            var sectorUsa = MemoryMarshal.Cast<byte, ushort>(record.Slice(offsetToUs + 2, (sizeOfUsa - 1) * 2));
-
-            for (int i = 0; i < sectorUsa.Length; i++)
+            ushort usn = BinaryPrimitives.ReadUInt16LittleEndian(record[usaOffset..]);
+            for (int i = 1; i < usaEntryCount; i++)
             {
-                var sectorUsnSlice = record.Slice((i + 1) * BytesPerSector - 2, 2);
-                ushort currentEosValue = BinaryPrimitives.ReadUInt16LittleEndian(sectorUsnSlice);
+                var tail = record.Slice(i * SequenceNumberStride - 2, 2);
+                if (BinaryPrimitives.ReadUInt16LittleEndian(tail) != usn)
+                    throw new NtfsFixupException($"USN mismatch in stride {i - 1}!");
 
-                if (currentEosValue != usn)
-                    throw new NtfsFixupException($"Failed to fixup record - USN-Value of Sector {i} ({currentEosValue})" +
-                        $" does not match expected USN-Value ({usn})!");
-
-                BinaryPrimitives.WriteUInt16LittleEndian(sectorUsnSlice, sectorUsa[i]);
+                record.Slice(usaOffset + i * 2, 2).CopyTo(tail);
             }
         }
     }

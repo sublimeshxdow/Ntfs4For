@@ -44,18 +44,17 @@ namespace Nternal
                 throw new InvalidOperationException(
                     $"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
 
-            int recordsPerCluster = BootSector.BytesPerCluster / BootSector.FileRecordSize;
-            long clusterWithRecord = (long)reference.FileRecordId / recordsPerCluster;
-            int index = (int)(reference.FileRecordId % (ulong)recordsPerCluster);
-            int recordOffset = index * BootSector.FileRecordSize;
-
-            Span<byte> fileRecordCluster = new byte[BootSector.BytesPerCluster];
-            mftStream.ReadExactly(clusterWithRecord * BootSector.BytesPerCluster, fileRecordCluster);
-            Span<byte> fileRecord = fileRecordCluster[recordOffset..(recordOffset + BootSector.FileRecordSize)];
+            var fileRecordSize = BootSector.FileRecordSize;
+            Span<byte> fileRecord = fileRecordSize <= 4096 ? stackalloc byte[fileRecordSize] : new byte[fileRecordSize];
+            mftStream.ReadExactly((long)reference.FileRecordId * fileRecordSize, fileRecord);
 
             FixupHelper.FixupRecord(fileRecord);
 
             var rawRecord = new RawFileRecord(fileRecord);
+            if (rawRecord.MagicNumber != GenericFileRecord.ExpectedMagicNumber)
+                throw new InvalidDataException($"FileRecord referenced by {reference} has an invalid magic number ({rawRecord.MagicNumber}, " +
+                    $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
+
             if (compareSequence && rawRecord.SequenceNumber != reference.SequenceNumber)
             {
                 string msg = $"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!";
@@ -269,6 +268,6 @@ namespace Nternal
         }
 
         public IndexParser CreateIndexParser(NtfsFile file, string index) =>
-            new IndexParser(file, index, CollationHandler, FixupHelper, BootSector);
+            new IndexParser(file, index, CollationHandler, BootSector);
     }
 }

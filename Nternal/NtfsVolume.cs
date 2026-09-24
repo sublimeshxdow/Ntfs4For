@@ -23,8 +23,6 @@ namespace Nternal
         private IDataStream _provider;
 
         public NtfsBootSector BootSector { get; private set; }
-
-        public FixupHelper FixupHelper { get; private set; }
         public CollationHandler CollationHandler { get; private set; }
 
         private DataRun[] _cachedBadRanges;
@@ -58,8 +56,7 @@ namespace Nternal
             SecureFile = GetKnownNtfsFile(KnownMftRecord.Secure);
         }
 
-        public UsnJournalReader GetJournalReader() =>
-            new UsnJournalReader(GetNtfsFile("/$Extend/$UsnJrnl"), BootSector.BytesPerCluster);
+        public UsnJournalReader GetJournalReader() => new UsnJournalReader(GetNtfsFile("/$Extend/$UsnJrnl"));
 
         private void ParseBootSector()
         {
@@ -67,7 +64,6 @@ namespace Nternal
             _provider.ReadExactly(0, bootSector);
 
             BootSector = new(bootSector);
-            FixupHelper = new(BootSector.BytesPerSector);
         }
 
         private void SetupUpcaseTable()

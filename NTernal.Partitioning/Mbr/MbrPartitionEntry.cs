@@ -41,7 +41,7 @@ namespace Nternal.Partitioning.Mbr
         {
             if (Underlying == null)
                 throw new InvalidOperationException($"The MasterBootRecord used to create this MbrPartitionEntry was created without a valid disk stream!");
-            
+
             return PartitionType == MbrPartitionType.Empty ? throw new InvalidOperationException($"Cannot create a partition stream for an unused partition!")
                 : new PartitionStream(Underlying, this);
         }
@@ -61,6 +61,6 @@ namespace Nternal.Partitioning.Mbr
         public uint SizeInSectors { get; }
 
         ulong IPartitionEntry.StartingLba => StartingLba;
-        ulong IPartitionEntry.EndingLba => StartingLba + SizeInSectors;
+        ulong IPartitionEntry.InclusiveEndingLba => StartingLba + SizeInSectors - 1;
     }
 }

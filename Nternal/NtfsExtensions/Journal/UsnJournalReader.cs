@@ -8,17 +8,17 @@ namespace Nternal.Ntfs.NtfsExtensions.Journal;
 public class UsnJournalReader
 {
     private NtfsFile _file;
-    private int _clusterSize;
 
     public ulong MaximumSize { get; private set; }
     public ulong AllocationDelta { get; private set; }
     public ulong UsnId { get; private set; }
     public long LowestValidUsn { get; private set; }
 
-    public UsnJournalReader(NtfsFile file, int clusterSize)
+    private const uint UsnPageSize = 4096;
+
+    public UsnJournalReader(NtfsFile file)
     {
         _file = file;
-        _clusterSize = clusterSize;
         ParseMaxStream();
     }
 
@@ -59,7 +59,7 @@ public class UsnJournalReader
             uint length = buffer.ReadUInt32(offset);
             if (length < 0x3C)
             {
-                long nextBoundary = ((offset / _clusterSize) + 1) * _clusterSize;
+                long nextBoundary = ((offset / UsnPageSize) + 1) * UsnPageSize;
                 if (nextBoundary >= buffer.Length)
                     break;
 
@@ -107,11 +107,11 @@ public class UsnJournalReader
             return data;
         }
 
-        var nonResidentStream = (NonResidentDataStream)journal.GetStream();
+        var nonResidentStream = (NonResidentDataStream)journal.Underlying.Accessor;
         long offset = (nonResidentStream.GetFirstNonSparseVcn() ?? 0) * nonResidentStream.GetBytesPerCluster();
         long diskAllocatedLength = nonResidentStream.AllocatedLength - offset;
         long actualLength = nonResidentStream.Length - offset;
-        
+
         if (diskAllocatedLength > int.MaxValue)
             throw new NotImplementedException($"Support for journals larger than 2 GBs has not been implemented yet!");
 

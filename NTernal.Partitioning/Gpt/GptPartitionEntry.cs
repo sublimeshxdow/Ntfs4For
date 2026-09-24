@@ -17,7 +17,7 @@ namespace Nternal.Partitioning.Gpt
             TypeGuid = new Guid(buffer[0..16]);
             PartitionGuid = new Guid(buffer[16..32]);
             StartingLba = buffer.ReadUInt64(32);
-            EndingLba = buffer.ReadUInt64(40);
+            InclusiveEndingLba = buffer.ReadUInt64(40);
             Flags = (GptPartitionFlags)buffer.ReadUInt64(48);
             Name = buffer.ReadUnicodeString(56, 72, paranoid);
         }
@@ -34,7 +34,7 @@ namespace Nternal.Partitioning.Gpt
         public Guid TypeGuid { get; init; }
         public Guid PartitionGuid { get; init; }
         public ulong StartingLba { get; init; }
-        public ulong EndingLba { get; init; }
+        public ulong InclusiveEndingLba { get; init; }
         public GptPartitionFlags Flags { get; init; }
         public string Name { get; init; }
 

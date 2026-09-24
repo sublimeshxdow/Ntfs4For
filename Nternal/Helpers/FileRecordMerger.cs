@@ -24,6 +24,10 @@ public class FileRecordMerger(NtfsVolume volume, NtfsFile file, bool isMft)
     {
         IDataStream? mftStream = _isMft ? _file.NtfsAttributes.First(x => x.Type == NtfsAttributeType.Data).Accessor : null;
 
+        // Wrap if unaligned
+        if (mftStream != null && mftStream.Alignment != 1)
+            mftStream = new UnalignedDataStream(mftStream);
+
         if (!_cachedFileRecords.ContainsKey(entry.BaseFileReference))
             _cachedFileRecords[entry.BaseFileReference] = _volume.GetRawRecordData(entry.BaseFileReference, isAttributeLookup: true,
                 mft: mftStream, compareSequence: true);

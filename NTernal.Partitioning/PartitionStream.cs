@@ -4,7 +4,7 @@ namespace Nternal.Partitioning
 {
     public class PartitionStream : IDataStream
     {
-        public long Length => (long)(Entry.EndingLba - Entry.StartingLba) * Alignment;
+        public long Length => (long)(Entry.InclusiveEndingLba - Entry.StartingLba + 1) * Alignment;
         public long AllocatedLength => Length;
         public int Alignment => Underlying.Alignment;
 

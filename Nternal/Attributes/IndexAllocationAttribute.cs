@@ -7,7 +7,7 @@ public class IndexAllocationAttribute : IParsableAttribute
 {
     public static NtfsAttributeType AttributeType => NtfsAttributeType.IndexAllocation;
     
-    private const string ExpectedSignature = "INDX";
+    public const string ExpectedSignature = "INDX";
     
     public NtfsAttribute Underlying { get; init; } = null!;
     public void ParseFromAccessor(bool paranoid)

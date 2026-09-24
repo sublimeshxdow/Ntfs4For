@@ -27,6 +27,8 @@ namespace Nternal.Structs
                 NumberOfMftRecord = BinaryPrimitives.ReadUInt32LittleEndian(fullBuffer.Slice(0x2C, 4));
         }
 
+        public const string ExpectedMagicNumber = "FILE";
+
         public string MagicNumber { get; } = "";
         public ulong Lsn { get; }
         public ushort SequenceNumber { get; }

@@ -17,14 +17,14 @@ public class IndexParser
     internal readonly BitmapAttribute? Bitmap;
 
     internal readonly bool Paranoid;
-
     internal readonly CollationHandler CollationHandler;
-    internal readonly FixupHelper FixupHelper;
 
     private readonly NtfsBootSector BootSector;
-    private readonly IDataStream UnalignedIndexAllocationStream;
+    private readonly IDataStream? UnalignedIndexAllocationStream;
 
-    public IndexParser(NtfsFile file, string index, CollationHandler handler, FixupHelper helper, NtfsBootSector bootSector)
+    private const int IndexAllocationVcnUnit = 512;
+
+    public IndexParser(NtfsFile file, string index, CollationHandler handler, NtfsBootSector bootSector)
     {
         IndexRoot = file.GetAttributeData<IndexRootAttribute>(NtfsAttributeType.IndexRoot, index) ??
                     throw new ArgumentException($"Index \"{index}\" could not be found in file {file.GetReference()}!");
@@ -33,8 +33,6 @@ public class IndexParser
 
         Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing);
         CollationHandler = handler;
-        FixupHelper = helper;
-
         BootSector = bootSector;
 
         if (IndexAllocation != null)
@@ -42,14 +40,13 @@ public class IndexParser
     }
 
     public IndexParser(IndexRootAttribute root, IndexAllocationAttribute? allocation, BitmapAttribute? bitmap,
-        CollationHandler handler, FixupHelper helper, NtfsBootSector bootSector)
+        CollationHandler handler, NtfsBootSector bootSector)
     {
         IndexRoot = root;
         IndexAllocation = allocation;
         Bitmap = bitmap;
         Paranoid = NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing);
         CollationHandler = handler;
-        FixupHelper = helper;
         BootSector = bootSector;
 
         if (IndexAllocation != null)
@@ -125,7 +122,10 @@ public class IndexParser
 
     private byte[]? GetIndexBuffer(long node)
     {
-        long byteOffset = node * (IndexRoot.ChildVcnInSectorUnits ? BootSector.BytesPerSector : BootSector.BytesPerCluster);
+        if (Bitmap == null || UnalignedIndexAllocationStream == null)
+            return null;
+
+        long byteOffset = node * (IndexRoot.ChildVcnInSectorUnits ? IndexAllocationVcnUnit : BootSector.BytesPerCluster);
         long bitmapBit = byteOffset / IndexRoot.BytesPerIndexBlock;
 
         if (!Bitmap.IsSet(bitmapBit))
@@ -134,6 +134,13 @@ public class IndexParser
 
         byte[] indexBuffer = new byte[IndexRoot.BytesPerIndexBlock];
         UnalignedIndexAllocationStream.ReadExactly(byteOffset, indexBuffer);
+
+        string magicNumber;
+        if ((magicNumber = Encoding.ASCII.GetString(indexBuffer, 0, 4)) != IndexAllocationAttribute.ExpectedSignature)
+            throw new InvalidDataException($"Index-Buffer {node} has an invalid magic number ({magicNumber}, " +
+                $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
+
+
         FixupHelper.FixupRecord(indexBuffer);
 
         int offset = 0x18 + indexBuffer.AsSpan().ReadUInt16(0x18);
