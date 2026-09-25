@@ -28,9 +28,9 @@ namespace Nternal
         private DataRun[] _cachedBadRanges;
         private BitmapAttribute _rawClusterMap;
 
-        public NtfsFile VolumeClusterFile { get; private set; }
-        public NtfsFile RootFolder { get; private set; }
-        public NtfsFile SecureFile { get; private set; }
+        private NtfsFile VolumeClusterFile { get; set; }
+        private NtfsFile RootFolder { get; set; }
+        private NtfsFile SecureFile { get; set; }
 
         public NtfsVolume(IDataStream dataProvider)
         {
@@ -39,9 +39,11 @@ namespace Nternal
 
         public void Dispose()
         {
-            var mftStream = MftFile!.GetAttributeData<DataAttribute>("")!.GetStream();
-            mftStream.Dispose();
-            Console.WriteLine("Disposed!");
+            if (_isMounted)
+            {
+                var mftStream = MftFile!.GetAttributeData<DataAttribute>("")!.GetStream();
+                mftStream.Dispose();
+            }
         }
 
         public void Mount(bool loadMftIntoMemory = true)
@@ -59,13 +61,14 @@ namespace Nternal
                 mftStream.LoadIntoMemory();
             }
 
-            VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Volume);
-            RootFolder = GetKnownNtfsFile(KnownMftRecord.Root);
+            VolumeBitmapFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Volume);
+            RootFolder = GetKnownNtfsFileUnsafe(KnownMftRecord.Root);
             SetupUpcaseTable();
 
-            VolumeClusterFile = GetKnownNtfsFile(KnownMftRecord.BadClus);
-            VolumeBitmapFile = GetKnownNtfsFile(KnownMftRecord.Bitmap);
-            SecureFile = GetKnownNtfsFile(KnownMftRecord.Secure);
+            VolumeClusterFile = GetKnownNtfsFileUnsafe(KnownMftRecord.BadClus);
+            VolumeBitmapFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Bitmap);
+            SecureFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Secure);
+            _isMounted = true;
         }
 
         public UsnJournalReader GetJournalReader() => new UsnJournalReader(GetNtfsFile("/$Extend/$UsnJrnl"));
@@ -82,7 +85,7 @@ namespace Nternal
         {
             const int Utf16CharCount = 65536, Utf16ByteCount = Utf16CharCount * 2;
 
-            UpcaseFile = GetKnownNtfsFile(KnownMftRecord.UpCase);
+            UpcaseFile = GetKnownNtfsFileUnsafe(KnownMftRecord.UpCase);
             var upcaseStream = UpcaseFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "")
                 .GetStream();
 
@@ -119,11 +122,13 @@ namespace Nternal
 
         public IEnumerable<FolderEntry> EnumerateDirectory(string path)
         {
+            EnsureIsMounted();
             return EnumerateDirectory(GetNtfsFile(path).GetReference());
         }
 
         public IEnumerable<FolderEntry> EnumerateDirectory(FileReference folder)
         {
+            EnsureIsMounted();
             var file = GetNtfsFile(folder);
             if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
                 throw new ArgumentException($"\"{GetPrimaryAbsolutePath(folder)}\" is not a directory!");
@@ -135,6 +140,7 @@ namespace Nternal
 
         public DataRun[] GetBadClusterRanges()
         {
+            EnsureIsMounted();
             List<DataRun> badClusters = new();
             var data = VolumeClusterFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "$Bad");
             if (data.Underlying.Accessor is not NonResidentDataStream stream)
@@ -154,6 +160,7 @@ namespace Nternal
 
         public ClusterState GetClusterState(long cluster)
         {
+            EnsureIsMounted();
             if (cluster < 0 || cluster >= BootSector.TotalClusters)
                 throw new ArgumentOutOfRangeException(nameof(cluster),
                     $"Cluster {cluster} is out of range - must be within 0 and {BootSector.TotalClusters}!");
@@ -173,6 +180,7 @@ namespace Nternal
 
         public bool IsClusterUsed(long cluster)
         {
+            EnsureIsMounted();
             if (cluster < 0 || cluster >= BootSector.TotalClusters)
                 throw new ArgumentOutOfRangeException(nameof(cluster),
                     $"Cluster {cluster} is out of range - must be within 0 and {BootSector.TotalClusters}!");
@@ -183,18 +191,21 @@ namespace Nternal
         internal IDataStream GetUnderlyingStream() => _provider;
 
         private bool _hasParsedMftYet = false;
+        private bool _isMounted = false;
 
-        public NtfsFile? MftFile { get; private set; }
-        public BitmapIndex? MftBitmap { get; private set; }
+        internal NtfsFile? MftFile { get; set; }
+        private BitmapIndex? MftBitmap { get; set; }
 
-        public NtfsFile? UpcaseFile { get; private set; }
+        private NtfsFile? UpcaseFile { get; set; }
 
-        public NtfsFile? VolumeBitmapFile { get; private set; }
+        private NtfsFile? VolumeBitmapFile { get; set; }
 
         private DataRun[] BadClusterRanges
         {
             get
             {
+                EnsureIsMounted();
+
                 _cachedBadRanges ??= GetBadClusterRanges();
                 return _cachedBadRanges;
             }
@@ -204,6 +215,8 @@ namespace Nternal
         {
             get
             {
+                EnsureIsMounted();
+
                 if (_rawClusterMap == null)
                 {
                     var bitmap = VolumeBitmapFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
@@ -216,6 +229,12 @@ namespace Nternal
 
                 return _rawClusterMap;
             }
+        }
+
+        private void EnsureIsMounted()
+        {
+            if (!_isMounted)
+                throw new InvalidOperationException($"The volume has not been mounted yet!");
         }
     }
 }

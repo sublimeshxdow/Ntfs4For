@@ -47,6 +47,8 @@ internal class Program
         Stopwatch s = new();
         s.Start();
 
+        v.EnumerateDirectory("/").ToList();
+
         long errors = 0;
 
         for (long l = 0; l < v.GetMftRecordCount(); l++)

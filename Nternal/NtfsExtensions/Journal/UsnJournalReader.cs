@@ -103,7 +103,7 @@ public class UsnJournalReader
             if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ParanoidParsing))
                 throw new InvalidDataException($"$UsnJrnl:$J should never be resident!");
 
-            ((ResidentDataStream)journal.GetStream()).TryGetMemory(out var data);
+            ((ResidentDataStream)journal.Underlying.Accessor).TryGetMemory(out var data);
             return data;
         }
 

@@ -19,7 +19,7 @@ namespace Nternal
 {
     public partial class NtfsVolume
     {
-        public RawFileRecord GetRawRecordData(FileReference reference, bool isAttributeLookup = false,
+        internal RawFileRecord GetRawRecordData(FileReference reference, bool isAttributeLookup = false,
             bool compareSequence = true, IDataStream? mft = null)
         {
             if (_hasParsedMftYet)
@@ -69,11 +69,12 @@ namespace Nternal
 
         public NtfsFile ParseFile(FileReference reference)
         {
+            EnsureIsMounted();
             var raw = GetRawRecordData(reference);
             return new NtfsFile(raw, _provider, this);
         }
 
-        public void ParseMft(bool paranoid = true, bool fixup = true, bool postXp = true)
+        private void ParseMft(bool paranoid = true, bool fixup = true, bool postXp = true)
         {
             var raw = GetMftRecord(paranoid, fixup);
             MftFile = new NtfsFile(raw, _provider, this, postXp);
@@ -81,16 +82,24 @@ namespace Nternal
         }
 
         public FileReference GetKnownMftReference(KnownMftRecord record)
-        {
-            return new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
-        }
+            => new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
 
         public NtfsFile GetKnownNtfsFile(KnownMftRecord record)
         {
-            return GetNtfsFile(GetKnownMftReference(record), true);
+            EnsureIsMounted();
+            return GetKnownNtfsFileUnsafe(record);
         }
 
+        private NtfsFile GetKnownNtfsFileUnsafe(KnownMftRecord record)
+            => GetNtfsFileUnsafe(GetKnownMftReference(record), true);
+
         public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
+        {
+            EnsureIsMounted();
+            return GetNtfsFileUnsafe(reference, compareSequence);
+        }
+
+        private NtfsFile GetNtfsFileUnsafe(FileReference reference, bool compareSequence = true)
         {
             var rawRecord = GetRawRecordData(reference, isAttributeLookup: false, compareSequence: compareSequence);
             return new NtfsFile(rawRecord, _provider, this, true);
@@ -98,11 +107,13 @@ namespace Nternal
 
         public long GetMftRecordCount()
         {
+            EnsureIsMounted();
             return MftFile!.GetDataStream().Length / BootSector.FileRecordSize;
         }
 
         public string GetPrimaryAbsolutePath(FileReference reference)
         {
+            EnsureIsMounted();
             FileReference root = GetKnownMftReference(KnownMftRecord.Root);
             FileReference currentReference = reference;
             StringBuilder sb = new(256);
@@ -132,6 +143,7 @@ namespace Nternal
 
         public NtfsFile GetNtfsFile(string path)
         {
+            EnsureIsMounted();
             if (RootFolder == null)
                 throw new InvalidOperationException(
                     "Cannot parse arbitrary NTFS files before initialization completed!");
@@ -211,6 +223,7 @@ namespace Nternal
 
         public SecurityDescriptor? GetSecurityDescriptor(NtfsFile file)
         {
+            EnsureIsMounted();
             var descriptor = file.GetAttributeData<SecurityDescriptorAttribute>("");
             if (descriptor != null)
                 return descriptor.Descriptor;
@@ -221,6 +234,7 @@ namespace Nternal
 
         private SecurityDescriptor? LookupSecurityDescriptorByIndex(uint securityId)
         {
+            EnsureIsMounted();
             Span<byte> lookupKey = stackalloc byte[sizeof(uint)];
             BinaryPrimitives.WriteUInt32LittleEndian(lookupKey, securityId);
 
@@ -267,7 +281,10 @@ namespace Nternal
             return new RawFileRecord(mftRecord);
         }
 
-        public IndexParser CreateIndexParser(NtfsFile file, string index) =>
-            new IndexParser(file, index, CollationHandler, BootSector);
+        public IndexParser CreateIndexParser(NtfsFile file, string index)
+        {
+            EnsureIsMounted();
+            return new IndexParser(file, index, CollationHandler, BootSector);
+        }
     }
 }

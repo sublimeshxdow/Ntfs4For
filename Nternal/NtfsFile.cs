@@ -186,7 +186,7 @@ namespace Nternal.Attributes
             int expected = data.Entries.Count + 1;
 
             // Be aware, $AttributeList does not list itself!
-            if (produced < expected)
+            if (produced != expected)
             {
 #if DEBUG
                 StringBuilder _produced = new();

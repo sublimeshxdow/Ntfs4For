@@ -6,6 +6,7 @@ namespace Nternal.Core
 {
     public sealed class Win32PartitionStream : IDataStream
     {
+        private readonly string _path;
         private readonly SafeFileHandle _handle;
 
         public long Length { get; }
@@ -21,6 +22,7 @@ namespace Nternal.Core
 
         public Win32PartitionStream(string devicePath)
         {
+            _path = devicePath;
             _handle = File.OpenHandle(
                 devicePath,
                 FileMode.Open,
@@ -44,11 +46,9 @@ namespace Nternal.Core
 
         public int Read(long position, Span<byte> buffer)
         {
+            EnsureOpen();
             if (position % Alignment != 0 || buffer.Length % Alignment != 0)
-            {
-                Debugger.Break();
                 return FallbackAlignerStream.Read(position, buffer);
-            }
 
             if (position < 0 || position > Length)
                 throw new ArgumentOutOfRangeException(nameof(position));
@@ -64,10 +64,10 @@ namespace Nternal.Core
 
         public void ReadExactly(long position, Span<byte> buffer)
         {
+            EnsureOpen();
             if (position % Alignment != 0 || buffer.Length % Alignment != 0)
             {
-                Debugger.Break();
-                FallbackAlignerStream.Read(position, buffer);
+                FallbackAlignerStream.ReadExactly(position, buffer);
                 return;
             }
 
@@ -90,13 +90,21 @@ namespace Nternal.Core
 
         public bool TryGetMemory(out Span<byte> memory)
         {
+            EnsureOpen();
             memory = default;
             return false;
         }
 
         public void Dispose()
         {
-            _handle.Dispose();
+            if (!_handle.IsClosed)
+                _handle.Dispose();
+        }
+
+        private void EnsureOpen()
+        {
+            if (_handle.IsClosed)
+                throw new InvalidOperationException($"The handle to \"{_path}\" has been closed already!");
         }
     }
 }

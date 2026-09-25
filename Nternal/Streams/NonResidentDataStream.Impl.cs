@@ -29,7 +29,8 @@ public partial class NonResidentDataStream
                 clustersCovered += overlapClusters;
             }
 
-            if (extentEndExclusive >= highVcn) break;
+            if (extentEndExclusive >= highVcn)
+                break;
         }
 
         if (clustersCovered != count)

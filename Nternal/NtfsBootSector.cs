@@ -106,7 +106,7 @@ namespace Nternal
 
             byte rawSectorsPerCluster = sector[0x0D];                                                              // 1 byte
             SectorsPerCluster = rawSectorsPerCluster <= 0x80 ? rawSectorsPerCluster : 1 << (256 - rawSectorsPerCluster);   // make it an int
-            if (SectorsPerCluster < 0 || BitOperations.PopCount((uint)SectorsPerCluster) != 1)
+            if (!BitOperations.IsPow2((uint)SectorsPerCluster))
                 throw new InvalidDataException($"SectorsPerCluster must be positive, and a power of two, but got {SectorsPerCluster}!");
 
             ReservedSectors = BinaryPrimitives.ReadUInt16LittleEndian(sector[0x0E..]);               // 2 bytes (always 0 for NTFS)
@@ -126,6 +126,11 @@ namespace Nternal
 
             VolumeSerialNumber = BinaryPrimitives.ReadUInt64LittleEndian(sector[0x48..]);             // 8 bytes
             BootSignature = BinaryPrimitives.ReadUInt16LittleEndian(sector[0x1FE..]);                 // 2 bytes: 0xAA55 marker
+
+            if (!BitOperations.IsPow2(FileRecordSize) || FileRecordSize < 1024 || FileRecordSize > 65536)
+                throw new InvalidDataException($"Unsupported file record size ({FileRecordSize})!");
+            if (!BitOperations.IsPow2(IndexBufferSize) || IndexBufferSize < 1024 || IndexBufferSize > 65536)
+                throw new InvalidDataException($"Unsupported index buffer size ({IndexBufferSize})!");
         }
 
         /// <summary>

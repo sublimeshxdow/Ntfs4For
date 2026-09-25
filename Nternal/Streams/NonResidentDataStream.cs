@@ -82,8 +82,14 @@ namespace Nternal.Streams
 
         public void Dispose()
         {
-            if (MemoryBuffer != IntPtr.Zero)
-                Marshal.FreeHGlobal(MemoryBuffer);
+            lock (_loadLock)
+            {
+                if (MemoryBuffer != IntPtr.Zero)
+                    Marshal.FreeHGlobal(MemoryBuffer);
+
+                MemoryBuffer = IntPtr.Zero;
+                _hasCacheLoaded = false;
+            }
         }
 
         public int Read(long position, Span<byte> buffer)

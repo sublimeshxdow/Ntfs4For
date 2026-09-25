@@ -144,9 +144,12 @@ public class IndexParser
 
         FixupHelper.FixupRecord(indexBuffer);
 
-        int offset = 0x18 + indexBuffer.ReadUInt16(0x18);
-        int length = indexBuffer.ReadInt32(0x1C);
-        return indexBuffer[offset..(offset + length)].ToArray();
+        int first = 0x18 + (int)indexBuffer.ReadUInt32(0x18);
+        int end = 0x18 + (int)indexBuffer.ReadUInt32(0x1C);
+        if (first < 0x28 || end > indexBuffer.Length || first > end)
+            throw new InvalidDataException($"Index buffer {node} has an invalid entry range");
+
+        return indexBuffer[first..end].ToArray();
     }
 
     private IndexEntry? TryFindAllocationEntry(long node, ReadOnlySpan<byte> key)
