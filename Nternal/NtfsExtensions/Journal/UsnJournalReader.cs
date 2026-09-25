@@ -33,7 +33,7 @@ public class UsnJournalReader
         Span<byte> data;
         if (!maxStream.TryGetMemory(out data))
         {
-            data = new byte[maxStream.AllocatedLength];
+            data = new byte[maxStream.Length];
             maxStream.ReadExactly(0, data);
         }
 

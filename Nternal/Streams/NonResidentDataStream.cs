@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using Nternal.Core;
 
 namespace Nternal.Streams
 {
@@ -53,7 +54,8 @@ namespace Nternal.Streams
 
         public void LoadIntoMemory()
         {
-            const int BlockSize = 16777216;
+            const int blockSize = 16777216;
+            using var readingStream = new UnalignedDataStream(this, true);
 
             lock (_loadLock)
             {
@@ -61,13 +63,13 @@ namespace Nternal.Streams
                     return;
 
                 long processed = 0, remaining = Length;
-                MemoryBuffer = Marshal.AllocHGlobal((nint)AllocatedLength);
+                MemoryBuffer = Marshal.AllocHGlobal((nint)Length);
 
                 while (true)
                 {
-                    var buffer = new Span<byte>((byte*)MemoryBuffer + processed, (int)Math.Min(remaining, BlockSize));
-                    int read = Read(processed, buffer);
-                    if (read < BlockSize)
+                    var buffer = new Span<byte>((byte*)MemoryBuffer + processed, (int)Math.Min(remaining, blockSize));
+                    int read = readingStream.Read(processed, buffer);
+                    if (read < blockSize)
                         break;
 
                     processed += read;
