@@ -28,10 +28,6 @@ namespace Nternal
         private DataRun[] _cachedBadRanges;
         private BitmapAttribute _rawClusterMap;
 
-        private NtfsFile VolumeClusterFile { get; set; }
-        private NtfsFile RootFolder { get; set; }
-        private NtfsFile SecureFile { get; set; }
-
         public NtfsVolume(IDataStream dataProvider)
         {
             _provider = dataProvider;
@@ -68,6 +64,8 @@ namespace Nternal
             VolumeClusterFile = GetKnownNtfsFileUnsafe(KnownMftRecord.BadClus);
             VolumeBitmapFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Bitmap);
             SecureFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Secure);
+
+            VolumeFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Volume);
             _isMounted = true;
         }
 
@@ -119,7 +117,7 @@ namespace Nternal
                         $" does not match computed checksum {calculatedChecksum.ToString("X16")}!");
             }
         }
-
+        
         public IEnumerable<FolderEntry> EnumerateDirectory(string path)
         {
             EnsureIsMounted();
@@ -194,11 +192,17 @@ namespace Nternal
         private bool _isMounted = false;
 
         internal NtfsFile? MftFile { get; set; }
-        private BitmapIndex? MftBitmap { get; set; }
-
+        
+        private NtfsFile VolumeClusterFile { get; set; }
+        private NtfsFile RootFolder { get; set; }
+        private NtfsFile SecureFile { get; set; }
         private NtfsFile? UpcaseFile { get; set; }
-
+        private NtfsFile? VolumeFile { get; set; }
         private NtfsFile? VolumeBitmapFile { get; set; }
+
+        // private Dictionary<KnownMftRecord, NtfsFile> NtfsMetaFiles { get; set; } = new(12);
+
+        private BitmapIndex? MftBitmap { get; set; }
 
         private DataRun[] BadClusterRanges
         {

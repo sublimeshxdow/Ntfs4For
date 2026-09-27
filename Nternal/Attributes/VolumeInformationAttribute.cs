@@ -4,34 +4,34 @@ using Nternal.Extensions;
 
 namespace Nternal.Ntfs.Attributes;
 
+[Flags]
+public enum VolumeFlags : ushort
+{
+    None = 0x0000,
+    Dirty = 0x0001,
+    ResizeLogFile = 0x0002,
+    UpgradeOnMount = 0x0004,
+    MountedOnNt4 = 0x0008, /* aka Object IDs/quotas/USN journal metadata can be corrupt */
+    DeleteUsnUnderway = 0x0010,
+    RepairObjectIds = 0x0020,
+    VolumeCorruptBugchecked = 0x0040,
+    PersistentNoTunnelingNo8Dot3 = 0x0080,
+    FullChkdskScanRequired = 0x0100,
+    ProactiveScanRequired = 0x0200,
+    PersistentTxfDisabld = 0x0400,
+    VolumeScrubDisabled = 0x0800,
+
+
+    HeatGatheringDisabled = 0x2000,
+    ChkdskUnderway = 0x4000,
+    ModifiedByChkdsk = 0x8000
+}
+
 public class VolumeInformationAttribute : IParsableAttribute
 {
     public static NtfsAttributeType AttributeType => NtfsAttributeType.VolumeInfo;
 
     public NtfsAttribute Underlying { get; init; } = null!;
-
-    [Flags]
-    public enum VolumeFlags : ushort
-    {
-        None = 0x0000,
-        Dirty = 0x0001,
-        ResizeLogFile = 0x0002,
-        UpgradeOnMount = 0x0004,
-        MountedOnNt4 = 0x0008, /* aka Object IDs/quotas/USN journal metadata can be corrupt */
-        DeleteUsnUnderway = 0x0010,
-        RepairObjectIds = 0x0020,
-        VolumeCorruptBugchecked = 0x0040,
-        PersistentNoTunnelingNo8Dot3 = 0x0080,
-        FullChkdskScanRequired = 0x0100,
-        ProactiveScanRequired = 0x0200,
-        PersistentTxfDisabld = 0x0400,
-        VolumeScrubDisabled = 0x0800,
-
-
-        HeatGatheringDisabled = 0x2000,
-        ChkdskUnderway = 0x4000,
-        ModifiedByChkdsk = 0x8000
-    }
 
     public byte MajorVersion { get; private set; }
     public byte MinorVersion { get; private set; }
