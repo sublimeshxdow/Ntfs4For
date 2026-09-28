@@ -24,6 +24,9 @@ internal class Program
 {
     private static void Main(string[] args)
     {
+        CheckDriveLetter(null);
+        return;
+        
         char[] letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'N'];
 
         Parallel.ForEach(letters, letter =>
@@ -32,16 +35,22 @@ internal class Program
         });
     }
 
-    static void CheckDriveLetter(char letter)
+    static void CheckDriveLetter(char? letter)
     {
-        var stream = new Win32PartitionStream($@"\\.\{letter}:");
-        //var stream = new Win32PartitionStream("/dev/nvme0n1p3", long.MaxValue);
+        Win32PartitionStream stream;
+        
+        if (letter != null)
+            stream = new Win32PartitionStream($@"\\.\{letter}:");
+        else
+            stream = new Win32PartitionStream("/dev/nvme0n1p3");
 
         using NtfsVolume v = new(stream);
         v.Mount();
-
+        
         //NtfsPolicyConfig.PolicyFlags ^= NtfsPolicyConfig.Flags.ValidateSequenceNumbers;
 
+        
+        Console.WriteLine($"Name={v.VolumeLabel} Version={v.VolumeVersion} Flags={v.VolumeFlags}");
         long processed = 0;
 
         Stopwatch s = new();
@@ -56,7 +65,7 @@ internal class Program
             try
             {
                 var test = v.GetNtfsFile(new FileReference((ulong)l, 0), false);
-
+                
                 //Interlocked.Add(ref processed, 1);
 
                 //if (processed % 100000 == 0)

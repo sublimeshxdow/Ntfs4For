@@ -30,11 +30,17 @@ namespace Nternal.Core
                 FileShare.ReadWrite | FileShare.Delete,
                 FileOptions.RandomAccess);
 
+            #if WINDOWS
             var sizes = DiskInfo.GetSectorSizes(devicePath);
             Alignment = (int)sizes.Logical;
 
             Length = DiskInfo.GetLength(_handle);
             AllocatedLength = Length;
+            #else
+            Alignment = 512;
+            Length = long.MaxValue;
+            AllocatedLength = long.MaxValue;
+            #endif
 
             FallbackAlignerStream = new(this);
         }
