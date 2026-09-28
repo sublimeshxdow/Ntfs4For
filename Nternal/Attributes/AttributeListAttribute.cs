@@ -20,7 +20,7 @@ namespace Nternal.Attributes
         public void ParseFromAccessor(bool paranoid)
         {
             Span<byte> buffer = new byte[Underlying.Accessor.AllocatedLength];
-            Underlying.Accessor.ReadExactly(0, buffer);
+            Underlying.Accessor.Read(0, buffer);
             buffer = buffer.Slice(0, (int)Underlying.Accessor.Length);
 
             while (buffer.Length >= 4)

@@ -109,13 +109,14 @@ namespace Nternal.Streams
             if (position % Alignment != 0 || buffer.Length % Alignment != 0)
                 throw new ArgumentException("Both position & buffer-size must be aligned to the cluster size!");
 
-            ReadIntoBuffer(buffer, position / _bytesPerCluster, buffer.Length / _bytesPerCluster);
-            return buffer.Length;
+            long readClusters = ReadIntoBuffer(buffer, position / _bytesPerCluster, buffer.Length / _bytesPerCluster, false);
+            return (int)(readClusters * _bytesPerCluster);
         }
 
         public void ReadExactly(long position, Span<byte> buffer)
         {
-            if (Read(position, buffer) != buffer.Length)
+            long read;
+            if ((read = Read(position, buffer)) != buffer.Length)
                 throw new EndOfStreamException();
         }
 

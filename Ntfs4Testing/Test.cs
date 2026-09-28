@@ -34,7 +34,7 @@ using System.Security.Cryptography.X509Certificates;
 class DecryptEfsFek
 {
     // ---- CONFIGURE THESE ----
-    const string PfxPath = @"C:\Users\xxluk\Desktop\cert.pfx";
+    const string PfxPath = @"C:\Users\user\Desktop\cert.pfx";
     const string PfxPassword = "1234";
 
     // The "Encrypted FEK" bytes from the DDF Key List Entry
@@ -238,8 +238,8 @@ class DecryptEfsFek
     // ---- Set this to a raw binary dump of the file's $DATA attribute bytes ----
     // (i.e. the on-disk ciphertext, exactly as it sits in the $DATA attribute --
     // NOT the EFSRPC "raw export" wire format, which adds its own framing).
-    const string EncryptedDataPath = @"C:\Users\xxluk\Desktop\encrypted";
-    const string DecryptedOutputPath = @"C:\Users\xxluk\Desktop\decrypted";
+    const string EncryptedDataPath = @"C:\Users\user\Desktop\encrypted";
+    const string DecryptedOutputPath = @"C:\Users\user\Desktop\decrypted";
 
     // Decrypts EFS-encrypted $DATA content that uses AES-256.
     //

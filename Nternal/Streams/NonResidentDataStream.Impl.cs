@@ -5,7 +5,7 @@ namespace Nternal.Streams;
 
 public partial class NonResidentDataStream
 {
-    public void ReadIntoBuffer(Span<byte> buffer, long startingVcn, int count)
+    public long ReadIntoBuffer(Span<byte> buffer, long startingVcn, int count, bool exactly)
     {
         long lowVcn = startingVcn, highVcn = startingVcn + count;
         long clustersCovered = 0;
@@ -33,9 +33,11 @@ public partial class NonResidentDataStream
                 break;
         }
 
-        if (clustersCovered != count)
+        if (exactly && clustersCovered != count)
             throw new InvalidDataException(
                 $"Extents have a gap: expected to cover {count} clusters but only found {clustersCovered}.");
+
+        return clustersCovered;
     }
 
     public void ReadFromExtend(Extent extent, Span<byte> bufferToFill, long startingVcn, int count)
