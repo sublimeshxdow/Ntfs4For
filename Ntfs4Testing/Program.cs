@@ -24,9 +24,6 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        CheckDriveLetter(null);
-        return;
-        
         char[] letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'N'];
 
         Parallel.ForEach(letters, letter =>
