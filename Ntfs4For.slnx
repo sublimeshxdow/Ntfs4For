@@ -5,6 +5,7 @@
     <Project Path="FileExtractor/FileExtractor.csproj" />
     <Project Path="FileInspector/FileInspector.csproj" />
     <Project Path="UsnJournalViewer/UsnJournalViewer.csproj" />
+    <Project Path="DeletedFileRecovery/DeletedFileRecovery.csproj" />
     <Project Path="VolumeInfo/VolumeInfo.csproj" />
   </Folder>
   <Project Path="NTernal.Core/Nternal.Core.csproj" Id="bd827fda-3465-439d-8d17-7e7dfee51126" />
