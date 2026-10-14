@@ -56,6 +56,7 @@ namespace FileInspector
                 PrintTimestamps(file);
                 PrintAttributes(file);
                 PrintSecurity(volume, file);
+                PrintEAs(volume, file);
                 return true;
             }
 
@@ -192,6 +193,20 @@ namespace FileInspector
             }
         }
 
+        private static void PrintEAs(NtfsVolume volume, NtfsFile file)
+        {
+            Section("EAs");
+            var ea = file.GetAttributeData<EaAttribute>();
+            if (ea == null)
+            {
+                Console.WriteLine("<No EAs present>");
+                return;
+            }
+
+            foreach (var entry in ea.EaEntries)
+                Console.WriteLine($"  EA: {entry.Name} [Flags: {entry.Flags}]: {entry.Value.Length} bytes");
+        }
+
         // ---- helpers ----
 
         private static readonly Dictionary<string, string> WellKnownSids = new()
@@ -238,8 +253,11 @@ namespace FileInspector
 
         private static string DescribeRecordFlags(FileRecordFlags flags)
         {
-            var parts = new List<string>();
-            parts.Add(flags.HasFlag(FileRecordFlags.IsInUse) ? "in use" : "DELETED (record is free)");
+            var parts = new List<string>
+            {
+                flags.HasFlag(FileRecordFlags.IsInUse) ? "in use" : "DELETED (record is free)"
+            };
+
             if (flags.HasFlag(FileRecordFlags.IsDirectory))
                 parts.Add("directory");
             return string.Join(", ", parts);

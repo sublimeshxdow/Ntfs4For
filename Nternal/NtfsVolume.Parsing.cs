@@ -35,7 +35,7 @@ namespace Nternal
                 if (!MftBitmap.IsInRange((long)reference.FileRecordId))
                     throw new Exception($"Attempted to parse an $Mft-Record! outside the valid range!");
 
-                if (!MftBitmap.IsSet((long)reference.FileRecordId))
+                if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.DenyUnusedMftRecords) && !MftBitmap.IsSet((long)reference.FileRecordId))
                     throw new Exception($"Attempted to parse an unused $Mft-Record!");
             }
 
@@ -51,6 +51,9 @@ namespace Nternal
             FixupHelper.FixupRecord(fileRecord);
 
             var rawRecord = new RawFileRecord(fileRecord);
+            if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.DenyUnusedMftRecords) && !rawRecord.Flags.HasFlag(FileRecordFlags.IsInUse))
+                throw new Exception($"Attempted to parse an unused $Mft-Record!");
+
             if (rawRecord.MagicNumber != GenericFileRecord.ExpectedMagicNumber)
                 throw new InvalidDataException($"FileRecord referenced by {reference} has an invalid magic number ({rawRecord.MagicNumber}, " +
                     $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
@@ -138,7 +141,7 @@ namespace Nternal
                 sb.Insert(0, $"/{fileNameAttr.FileNameData.Name}");
             }
 
-            return sb.ToString();
+            return sb.Length > 0 ? sb.ToString() : "/";
         }
 
         public NtfsFile GetNtfsFile(string path)

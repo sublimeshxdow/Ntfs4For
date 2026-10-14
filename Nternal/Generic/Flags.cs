@@ -4,6 +4,7 @@ using System.Text;
 
 namespace Nternal.Structs
 {
+    [Flags]
     public enum FileRecordFlags : ushort
     {
         IsInUse = 0x0001,

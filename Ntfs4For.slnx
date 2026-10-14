@@ -10,6 +10,5 @@
   <Project Path="NTernal.Core/Nternal.Core.csproj" Id="bd827fda-3465-439d-8d17-7e7dfee51126" />
   <Project Path="NTernal.Partitioning/Nternal.Partitioning.csproj" Id="8dbcb69b-6ba2-4cb5-9418-bdd76a364d8d" />
   <Project Path="Nternal/Nternal.Ntfs.csproj" />
-  <Project Path="Ntfs4For/Ntfs4For.csproj" />
   <Project Path="Ntfs4Testing/Ntfs4Testing.csproj" />
 </Solution>
