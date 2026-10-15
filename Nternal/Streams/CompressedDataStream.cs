@@ -37,7 +37,7 @@ public class CompressedDataStream : IDataStream
             int bytesPerUnit = GetBytesPerUnit();
             long length = ((_underlying.Length + bytesPerUnit - 1) / bytesPerUnit) * bytesPerUnit;
             if (length > int.MaxValue)
-                throw new InvalidOperationException("Cannot load a file larger than 2GBs into memory!"); // TODO?
+                throw new NotImplementedException("Cannot load a file larger than 2GBs into memory!"); // TODO?
 
             _cached = new byte[length];
             int parallelismDegree = _underlying.Extents.Count <= NtfsPolicyConfig.CompressionExtentParallelismThreshold

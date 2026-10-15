@@ -18,17 +18,19 @@ namespace Nternal.Attributes
     public class NtfsFile
     {
         private readonly NtfsVolume _ntfsVolume;
+        private readonly ulong _recordNumber;
 
-        public readonly RawFileRecord FileRecord;
+        public readonly RawFileRecord RecordHeader;
         public readonly List<NtfsAttribute> NtfsAttributes = [];
 
         public FileReference GetReference() =>
-            new FileReference(FileRecord.NumberOfMftRecord!.Value /*TODO*/, FileRecord.SequenceNumber);
+            new FileReference(_recordNumber, RecordHeader.SequenceNumber);
 
-        public NtfsFile(RawFileRecord record, IDataStream underlying, NtfsVolume ntfsVolume, bool postXP = true)
+        public NtfsFile(RawFileRecord record, IDataStream underlying, NtfsVolume ntfsVolume, ulong recordNumber, bool postXP = true)
         {
             _ntfsVolume = ntfsVolume;
-            FileRecord = record;
+            _recordNumber = recordNumber;
+            RecordHeader = record;
 
             ReadOnlySpan<byte> attributeBuffer = record.AttributeData;
 
@@ -114,6 +116,16 @@ namespace Nternal.Attributes
                 .Where(x => x.Type == T.AttributeType)
                 .Select(x => x.Cast<T>())
                 .ToArray();
+        }
+
+        public FileNameData? GetBestFittingName()
+        {
+            var names = GetAttributeDataArray<FileNameAttribute>().Select(x => x.FileNameData).ToList();
+
+            // Prefer the long Win32 name over the 8.3 DOS alias.
+            return names.FirstOrDefault(n => n.FileNamespace.HasFlag(FileNameNamespace.Win32))
+                   ?? names.FirstOrDefault(n => n.FileNamespace == FileNameNamespace.Posix)
+                   ?? names.FirstOrDefault();
         }
 
         private void ParseResidentAttribute(RawResidentAttributeHeader header, string name, ReadOnlySpan<byte> data)

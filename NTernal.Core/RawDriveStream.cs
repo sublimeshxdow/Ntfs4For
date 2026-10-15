@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace Nternal.Core
 {
-    public sealed class Win32PartitionStream : IDataStream
+    public sealed class RawDriveStream : IDataStream
     {
         private readonly string _path;
         private readonly SafeFileHandle _handle;
@@ -17,10 +17,10 @@ namespace Nternal.Core
         /// For cases where the logical partition sector size is larger than the logical physical sector size
         /// (f.e. HDDs without 512e support)
         /// </summary>
-        /// <returns></returns>
+        /// <returns>A wrapper object for the designated device stream, which supports unaligned reading.</returns>
         private UnalignedDataStream FallbackAlignerStream { get; }
 
-        public Win32PartitionStream(string devicePath)
+        public RawDriveStream(string devicePath)
         {
             _path = devicePath;
             _handle = File.OpenHandle(
@@ -30,18 +30,8 @@ namespace Nternal.Core
                 FileShare.ReadWrite | FileShare.Delete,
                 FileOptions.RandomAccess);
 
-            #if WINDOWS
-            var sizes = DiskInfo.GetSectorSizes(devicePath);
-            Alignment = (int)sizes.Logical;
-
-            Length = DiskInfo.GetLength(_handle);
-            AllocatedLength = Length;
-            #else
-            Alignment = 512;
-            Length = long.MaxValue;
-            AllocatedLength = long.MaxValue;
-            #endif
-
+            Alignment = (int)DiskInfo.GetSectorSizes(devicePath).Logical;
+            Length = DiskInfo.GetLength(devicePath);
             FallbackAlignerStream = new(this);
         }
 
@@ -64,7 +54,6 @@ namespace Nternal.Core
 
             long remaining = Length - position;
             int count = (int)Math.Min(buffer.Length, remaining);
-
             return RandomAccess.Read(_handle, buffer[..count], position);
         }
 

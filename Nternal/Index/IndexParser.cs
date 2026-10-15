@@ -106,7 +106,7 @@ public class IndexParser
             if (entry.Flags.HasFlag(IndexEntry.IndexFlags.IsLast))
                 yield break;
 
-            // TODO - For now, for $I30: Only return names with the Win32 namespace
+            // For now, for $I30: Only return names with the Win32 namespace
             if (IndexRoot.IndexedType == NtfsAttributeType.FileName)
             {
                 var nameSpace = (FileNameNamespace)entry.GetKey()[65];
@@ -116,6 +116,8 @@ public class IndexParser
                 if (NtfsPolicyConfig.ListPosixFileNames && nameSpace == FileNameNamespace.Posix)
                     yield return entry;
             }
+            else
+                yield return entry;
 
             // Look for next item in root
             bufferData = bufferData.Slice(length);

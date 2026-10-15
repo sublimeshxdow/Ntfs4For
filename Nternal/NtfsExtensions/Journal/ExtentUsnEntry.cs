@@ -25,12 +25,7 @@ public class ExtentUsnEntry : IUsnEntry
     public ulong Usn { get; init; }
     public UsnReason Reason { get; init; }
     public UsnSourceInfo SourceInfo { get; init; }
-
-    /// <summary>
-    /// Added relative to the original shape -- 0 means this is the LAST
-    /// V4 record for this file (a closing V3 record follows); nonzero
-    /// means more V4 records are still coming before that V3 arrives.
-    /// </summary>
+    
     public uint RemainingExtents { get; init; }
 
     public Extent[] Extents { get; init; } = Array.Empty<Extent>();

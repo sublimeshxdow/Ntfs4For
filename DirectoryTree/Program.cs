@@ -46,7 +46,7 @@ namespace DirectoryTree
         {
             try
             {
-                using var stream = new Win32PartitionStream(ResolveDevicePath(source));
+                using var stream = new RawDriveStream(ResolveDevicePath(source));
                 using var volume = new NtfsVolume(stream);
 
                 // We are going to touch many records - keeping $MFT in memory pays off quickly.
@@ -155,7 +155,7 @@ namespace DirectoryTree
                 {
                     SymbolicLinkReparseData link => link.PrintName.Length > 0 ? link.PrintName : link.SubstituteName,
                     MountPointReparseData mount => mount.PrintName.Length > 0 ? mount.PrintName : mount.SubstituteName,
-                    _ => $"reparse point ({reparse?.TypeAndFlags})"
+                    _ => $"reparse point ({reparse?.Tag})"
                 };
             }
 

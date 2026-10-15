@@ -55,7 +55,7 @@ namespace Nternal
                 throw new Exception($"Attempted to parse an unused $Mft-Record!");
 
             if (rawRecord.MagicNumber != GenericFileRecord.ExpectedMagicNumber)
-                throw new InvalidDataException($"FileRecord referenced by {reference} has an invalid magic number ({rawRecord.MagicNumber}, " +
+                throw new InvalidDataException($"RecordHeader referenced by {reference} has an invalid magic number ({rawRecord.MagicNumber}, " +
                     $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
 
             if (compareSequence && rawRecord.SequenceNumber != reference.SequenceNumber)
@@ -74,13 +74,13 @@ namespace Nternal
         {
             EnsureIsMounted();
             var raw = GetRawRecordData(reference);
-            return new NtfsFile(raw, _provider, this);
+            return new NtfsFile(raw, _provider, this, reference.FileRecordId);
         }
 
         private void ParseMft(bool paranoid = true, bool fixup = true, bool postXp = true)
         {
             var raw = GetMftRecord(paranoid, fixup);
-            MftFile = new NtfsFile(raw, _provider, this, postXp);
+            MftFile = new NtfsFile(raw, _provider, this, (ulong)KnownMftRecord.Mft, postXp);
             _hasParsedMftYet = true;
         }
 
@@ -105,7 +105,7 @@ namespace Nternal
         private NtfsFile GetNtfsFileUnsafe(FileReference reference, bool compareSequence = true)
         {
             var rawRecord = GetRawRecordData(reference, isAttributeLookup: false, compareSequence: compareSequence);
-            return new NtfsFile(rawRecord, _provider, this, true);
+            return new NtfsFile(rawRecord, _provider, this, reference.FileRecordId, true);
         }
 
         public long GetMftRecordCount()
@@ -130,15 +130,18 @@ namespace Nternal
                     file = GetNtfsFile(currentReference);
                 }
 
-                catch (Exception ex)
+                catch (FileNotFoundException)
                 {
                     sb.Insert(0, "??");
                     break;
                 }
 
-                var fileNameAttr = file.GetRequiredAttributeData<FileNameAttribute>(NtfsAttributeType.FileName, "");
-                currentReference = fileNameAttr.FileNameData.ParentFolder;
-                sb.Insert(0, $"/{fileNameAttr.FileNameData.Name}");
+                var fileNameAttr = file.GetBestFittingName();
+                if (fileNameAttr == null)
+                    throw new IOException($"Faield to retrieve absolute path of file {reference}.\n[File {file.GetReference()} has no suitable $File_Info attribute!]");
+
+                currentReference = fileNameAttr.ParentFolder;
+                sb.Insert(0, $"/{fileNameAttr.Name}");
             }
 
             return sb.Length > 0 ? sb.ToString() : "/";
@@ -176,7 +179,7 @@ namespace Nternal
                     continue;
                 }
 
-                if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
+                if (!file.RecordHeader.Flags.HasFlag(FileRecordFlags.IsDirectory))
                     throw new InvalidOperationException($"\"{entry}\" cannot be looked up inside a non-directory!");
 
                 IndexParser parser = CreateIndexParser(file, "$I30");
@@ -192,19 +195,16 @@ namespace Nternal
                 if (reparse != null)
                 {
                     var reparseData = reparse.Cast<ReparseAttribute>(true);
-                    if (reparseData.TypeAndFlags.HasFlag(ReparseTypeAndFlags.SymbolicLink))
+                    if (reparseData.Tag.HasFlag(ReparseTag.SymbolicLink))
                     {
                         if (++symlinkHops > NtfsPolicyConfig.HopLimit)
-                            throw new InvalidOperationException(
-                                "Too many symbolic link redirections -- possible loop.");
+                            throw new InvalidOperationException("Too many symbolic link redirections -- possible loop.");
 
                         var symlinkData = reparseData.Data as SymbolicLinkReparseData
-                                          ?? throw new InvalidOperationException(
-                                              $"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
+                                          ?? throw new InvalidOperationException($"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
 
                         if (!symlinkData.Flags.HasFlag(SymbolicLinkReparseData.SymlinkFlags.IsRelative))
-                            throw new NotSupportedException(
-                                $"Only relative symbolic links are currently supported (\"{entry}\" is absolute).");
+                            throw new NotSupportedException($"Only relative symbolic links are currently supported (\"{entry}\" is absolute).");
 
                         var targetParts = symlinkData.SubstituteName.Split('\\', StringSplitOptions.RemoveEmptyEntries);
                         for (int i = targetParts.Length - 1; i >= 0; i--)
@@ -222,6 +222,30 @@ namespace Nternal
             }
 
             return file;
+        }
+
+        public IEnumerable<(ReparseTag Tag, FileReference Reference)> EnumerateIndexedSymLinks()
+        {
+            NtfsFile file;
+            IndexParser index;
+
+            try
+            {
+                file = GetNtfsFile("/$Extend/$Reparse");
+                index = CreateIndexParser(file, "$R");
+            }
+
+            catch (FileNotFoundException)
+            {
+                yield break;
+            }
+
+            foreach (var entry in index.EnumerateEntries())
+            {
+                ReparseTag tag = (ReparseTag)entry.GetKey().ReadUInt32(0);
+                FileReference reference = new(entry.GetKey().ReadUInt64(4));
+                yield return (tag, reference);
+            }
         }
 
         public SecurityDescriptor? GetSecurityDescriptor(NtfsFile file)

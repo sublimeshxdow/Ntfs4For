@@ -20,13 +20,6 @@ public class BasicUsnEntry : IUsnEntry
     public FileFlags Flags { get; init; }
     public string FileName { get; init; } = "";
 
-    /// <summary>
-    /// Parses a USN_RECORD_V2 or USN_RECORD_V3 entry. Both share an
-    /// identical field layout after FileReferenceNumber/
-    /// ParentFileReferenceNumber -- only the reference width (8 vs 16
-    /// bytes) differs, so every subsequent offset is computed from that
-    /// single width rather than hardcoded per version.
-    /// </summary>
     public static BasicUsnEntry Parse(ReadOnlySpan<byte> data, bool paranoid = true)
     {
         if (paranoid && data.Length < 0x3C)

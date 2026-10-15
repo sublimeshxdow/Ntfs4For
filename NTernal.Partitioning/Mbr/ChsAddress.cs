@@ -12,8 +12,8 @@ namespace Nternal.Partitioning.Mbr
                 throw new ArgumentException("CHS address must be exactly 3 bytes long.", nameof(bytes));
 
             Head = bytes[0];
-            Sector = (byte)(bytes[1] & 0x3F); // Lower 6 bits for sector
-            Cylinder = (ushort)(((bytes[1] & 0xC0) << 2) | bytes[2]); // Upper 2 bits of sector and full cylinder)
+            Sector = (byte)(bytes[1] & 0x3F);
+            Cylinder = (ushort)(((bytes[1] & 0xC0) << 2) | bytes[2]);
         }
 
         public byte Head { get; init; }

@@ -55,7 +55,7 @@ namespace UsnJournalViewer
         {
             try
             {
-                using var stream = new Win32PartitionStream(ResolveDevicePath(source));
+                using var stream = new RawDriveStream(ResolveDevicePath(source));
                 using var volume = new NtfsVolume(stream);
                 volume.Mount(loadMftIntoMemory: true);
 

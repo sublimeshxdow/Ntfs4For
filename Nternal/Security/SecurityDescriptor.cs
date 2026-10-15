@@ -40,12 +40,7 @@ public sealed class SecurityDescriptor
         // Per MS-DTYP: if the *Present control bit is unset, the offset
         // field MUST be zero and the corresponding ACL MUST NOT be parsed
         // -- check both, not just whichever one happens to look truthy.
-        Sacl = Control.HasFlag(SecurityDescriptorControl.SaclPresent) && saclOffset != 0
-            ? new Acl(data[(int)saclOffset..], paranoid)
-            : null;
-
-        Dacl = Control.HasFlag(SecurityDescriptorControl.DaclPresent) && daclOffset != 0
-            ? new Acl(data[(int)daclOffset..], paranoid)
-            : null;
+        Sacl = Control.HasFlag(SecurityDescriptorControl.SaclPresent) && saclOffset != 0 ? new Acl(data[(int)saclOffset..], paranoid) : null;
+        Dacl = Control.HasFlag(SecurityDescriptorControl.DaclPresent) && daclOffset != 0 ? new Acl(data[(int)daclOffset..], paranoid) : null;
     }
 }

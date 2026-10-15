@@ -89,7 +89,7 @@ namespace DeletedFileRecovery
 
             try
             {
-                using var stream = new Win32PartitionStream(ResolveDevicePath(source));
+                using var stream = new RawDriveStream(ResolveDevicePath(source));
                 using var volume = new NtfsVolume(stream);
                 volume.Mount(false);
 
@@ -314,7 +314,7 @@ namespace DeletedFileRecovery
         public NtfsFile? ReadDeletedFile(long recordNumber)
         {
             var file = volume.GetNtfsFile(new FileReference((ulong)recordNumber, 0), compareSequence: false);
-            return file.FileRecord.Flags.HasFlag(FileRecordFlags.IsInUse) ? null : file;
+            return file.RecordHeader.Flags.HasFlag(FileRecordFlags.IsInUse) ? null : file;
         }
 
         /// <summary>
@@ -358,7 +358,7 @@ namespace DeletedFileRecovery
                     isDirectory, 0, default, Recoverability.Unreadable, ex.Message);
             }
 
-            var name = PickBestName(file);
+            var name = file.GetBestFittingName();
             if (name == null)
                 return null; // e.g. a reserved MFT record without a name
 
@@ -374,16 +374,6 @@ namespace DeletedFileRecovery
             var state = Assess(data, out long size);
             return new DeletedEntry(recordNumber, sequence, name.Name, name.ParentFolder, false,
                 size, info?.FileAltered ?? name.FileAltered, state, null);
-        }
-
-        private static FileNameData? PickBestName(NtfsFile file)
-        {
-            var names = file.GetAttributeDataArray<FileNameAttribute>().Select(x => x.FileNameData).ToList();
-
-            // Prefer the long Win32 name over the 8.3 DOS alias.
-            return names.FirstOrDefault(n => n.FileNamespace.HasFlag(FileNameNamespace.Win32))
-                   ?? names.FirstOrDefault(n => n.FileNamespace == FileNameNamespace.Posix)
-                   ?? names.FirstOrDefault();
         }
 
         /// <summary>
@@ -482,7 +472,7 @@ namespace DeletedFileRecovery
 
                 // Sequence numbers must match - otherwise the record now belongs to a different folder.
                 var file = _volume.GetNtfsFile(folder, compareSequence: true);
-                if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsInUse | FileRecordFlags.IsDirectory))
+                if (!file.RecordHeader.Flags.HasFlag(FileRecordFlags.IsInUse | FileRecordFlags.IsDirectory))
                     return false;
 
                 path = _volume.GetPrimaryAbsolutePath(folder);

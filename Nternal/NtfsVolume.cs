@@ -128,7 +128,7 @@ namespace Nternal
         {
             EnsureIsMounted();
             var file = GetNtfsFile(folder);
-            if (!file.FileRecord.Flags.HasFlag(FileRecordFlags.IsDirectory))
+            if (!file.RecordHeader.Flags.HasFlag(FileRecordFlags.IsDirectory))
                 throw new ArgumentException($"\"{GetPrimaryAbsolutePath(folder)}\" is not a directory!");
 
             var index = CreateIndexParser(file, "$I30");

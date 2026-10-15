@@ -33,7 +33,7 @@ namespace FileInspector
         {
             try
             {
-                using var stream = new Win32PartitionStream(ResolveDevicePath(source));
+                using var stream = new RawDriveStream(ResolveDevicePath(source));
                 using var volume = new NtfsVolume(stream);
                 volume.Mount(false);
 
@@ -41,7 +41,7 @@ namespace FileInspector
                     ? volume.GetNtfsFile(new FileReference(ulong.Parse(target[1..]), 0), compareSequence: false)
                     : volume.GetNtfsFile(target.Replace('\\', '/'));
 
-                var record = file.FileRecord;
+                var record = file.RecordHeader;
                 var reference = file.GetReference();
 
                 Section("Record");

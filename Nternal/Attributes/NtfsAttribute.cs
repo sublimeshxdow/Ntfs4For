@@ -1,11 +1,12 @@
-﻿using Nternal.Streams;
+﻿using Nternal.Core;
 using Nternal.Core.Streams;
+using Nternal.Ntfs;
+using Nternal.Ntfs.Attributes;
+using Nternal.Streams;
+using Nternal.Structs;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Nternal.Ntfs;
-using Nternal.Ntfs.Attributes;
-using Nternal.Structs;
 
 namespace Nternal.Attributes
 {

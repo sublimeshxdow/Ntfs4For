@@ -37,7 +37,7 @@ namespace MftExporter
             try
             {
                 // Mount volume
-                using var stream = new Win32PartitionStream(@$"\\.\{driveName}");
+                using var stream = new RawDriveStream(@$"\\.\{driveName}");
                 using var volume = new NtfsVolume(stream);
                 volume.Mount(false);
 

@@ -21,12 +21,6 @@ public class Ace
         AceType.AccessDeniedCallbackObject,
     };
 
-    /// <summary>
-    /// Parses exactly one ACE, dispatching to ObjectAce for the "object"
-    /// variants. Only consumes the header's own declared Size, so this
-    /// can safely be called on a span containing MULTIPLE trailing ACEs
-    /// -- read `.Size` afterward to know how far to advance.
-    /// </summary>
     public static Ace Parse(ReadOnlySpan<byte> data, bool paranoid = true)
     {
         if (data.Length < 4)
@@ -46,12 +40,6 @@ public class Ace
             : new Ace(aceData, sidOffset: 8, paranoid);
     }
 
-    /// <summary>
-    /// Base constructor. `sidOffset` differs between the simple and
-    /// "object" ACE shapes, so it's supplied explicitly rather than
-    /// hardcoded -- see ObjectAce for how it computes its own offset
-    /// before calling this.
-    /// </summary>
     protected Ace(ReadOnlySpan<byte> aceData, int sidOffset, bool paranoid)
     {
         if (paranoid && aceData.Length < sidOffset)

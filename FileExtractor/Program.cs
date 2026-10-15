@@ -34,12 +34,12 @@ namespace FileExtractor
 
             try
             {
-                using var stream = new Win32PartitionStream(ResolveDevicePath(source));
+                using var stream = new RawDriveStream(ResolveDevicePath(source));
                 using var volume = new NtfsVolume(stream);
                 volume.Mount(false);
 
                 var file = volume.GetNtfsFile(path);
-                if (file.FileRecord.Flags.HasFlag(Nternal.Structs.FileRecordFlags.IsDirectory) && streamName.Length == 0)
+                if (file.RecordHeader.Flags.HasFlag(Nternal.Structs.FileRecordFlags.IsDirectory) && streamName.Length == 0)
                     throw new ArgumentException($"\"{path}\" is a directory - only files can be extracted.");
 
                 using var dataStream = file.GetDataStream(streamName);
