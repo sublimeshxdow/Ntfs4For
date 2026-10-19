@@ -110,11 +110,21 @@ public class IndexParser
             if (IndexRoot.IndexedType == NtfsAttributeType.FileName)
             {
                 var nameSpace = (FileNameNamespace)entry.GetKey()[65];
-                if (nameSpace.HasFlag(FileNameNamespace.Win32))
-                    yield return entry;
 
-                if (NtfsPolicyConfig.ListPosixFileNames && nameSpace == FileNameNamespace.Posix)
-                    yield return entry;
+                if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.Disable8dot3LegacyMode))
+                {
+                    if (nameSpace.HasFlag(FileNameNamespace.Win32))
+                        yield return entry;
+
+                    if (NtfsPolicyConfig.ListPosixFileNames && nameSpace == FileNameNamespace.Posix)
+                        yield return entry;
+                }
+
+                else
+                {
+                    if (nameSpace.HasFlag(FileNameNamespace.Dos))
+                        yield return entry;
+                }
             }
             else
                 yield return entry;

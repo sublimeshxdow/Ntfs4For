@@ -122,10 +122,13 @@ namespace Nternal.Attributes
         {
             var names = GetAttributeDataArray<FileNameAttribute>().Select(x => x.FileNameData).ToList();
 
+            if (!NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.Disable8dot3LegacyMode))
+                return names.FirstOrDefault(n => n.FileNamespace.HasFlag(FileNameNamespace.Dos));
+
             // Prefer the long Win32 name over the 8.3 DOS alias.
             return names.FirstOrDefault(n => n.FileNamespace.HasFlag(FileNameNamespace.Win32))
-                   ?? names.FirstOrDefault(n => n.FileNamespace == FileNameNamespace.Posix)
-                   ?? names.FirstOrDefault();
+                       ?? names.FirstOrDefault(n => n.FileNamespace == FileNameNamespace.Posix)
+                       ?? names.FirstOrDefault();
         }
 
         private void ParseResidentAttribute(RawResidentAttributeHeader header, string name, ReadOnlySpan<byte> data)

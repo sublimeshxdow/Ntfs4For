@@ -1,0 +1,5 @@
+----- Disclaimer -----
+Most examples in this folder were generated with AI assistance (Anthropic's Claude), based on the
+public API of Nternal.Ntfs and Nternal.Partitioning. Each one has been reviewed and tested by me
+before being added.
+If you find a bug in one of these samples, please open an issue.

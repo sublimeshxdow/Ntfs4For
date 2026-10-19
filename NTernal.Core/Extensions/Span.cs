@@ -15,6 +15,16 @@ namespace Nternal.Extensions
         public static ulong ReadUInt64(this ReadOnlySpan<byte> span, int offset = 0) => BinaryPrimitives.ReadUInt64LittleEndian(span.Slice(offset, 8));
         public static string ReadAsciiString(this ReadOnlySpan<byte> span, int offset, int length) => Encoding.ASCII.GetString(span.Slice(offset, length));
         public static string ReadUnicodeString(this ReadOnlySpan<byte> span, int offset, int length) => Encoding.Unicode.GetString(span.Slice(offset, length));
+        
+        /// <summary>
+        /// Reads an unicode string from the current span.
+        /// </summary>
+        /// <param name="span">The span to read the unicode string from.</param>
+        /// <param name="offset">Where the unicode string starts within the span.</param>
+        /// <param name="maxLength">How many bytes (not chars) the unicode string covers.</param>
+        /// <param name="requiresTermination">Whether the unicode string must be zero-terminated.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
         public static string ReadUnicodeString(this ReadOnlySpan<byte> span, int offset, int maxLength, bool requiresTermination)
         {
             int end = Math.Min(offset + maxLength, span.Length);

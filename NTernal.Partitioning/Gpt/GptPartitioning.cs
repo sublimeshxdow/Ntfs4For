@@ -6,13 +6,25 @@ using System.Text;
 
 namespace Nternal.Partitioning.Gpt
 {
+    /// <summary>
+    /// Represents the GPT (Guid Partition Table) partitioning scheme, the successor of MBR.
+    /// </summary>
     public class GptPartitioning
     {
+        /// <summary>
+        /// Craetes a new instance of a GPT partitioning scheme.
+        /// </summary>
+        /// <param name="paranoid">Whether this instance should throw upon encountering corrupted / unusual data.</param>
         public GptPartitioning(bool paranoid = true)
         {
             _paranoid = paranoid;
         }
 
+        /// <summary>
+        /// Interprets the disk as GPT-partition-styled device in order to parse the partitioning header and partition entries.
+        /// </summary>
+        /// <param name="stream">The stream representing the underlying disk.</param>
+        /// <exception cref="InvalidOperationException">Thrown if the partitioning scheme could not be parsed (most likely due to corruption).</exception>
         public void ParseFromStream(IDataStream stream)
         {
             _stream = stream;
@@ -48,7 +60,7 @@ namespace Nternal.Partitioning.Gpt
 
         private void ParsePartitionArray()
         {
-            long arrayBytes = Math.Max(16384L, (long)Header.NumberOfPartitionEntries * Header.SizeOfPartitionEntry);
+            long arrayBytes = Math.Max(16384, (long)Header.NumberOfPartitionEntries * Header.SizeOfPartitionEntry);
             long arraySectors = (arrayBytes + _stream!.Alignment - 1) / _stream!.Alignment;
             long actualBytesToRead = arraySectors * _stream!.Alignment;
 
@@ -66,11 +78,10 @@ namespace Nternal.Partitioning.Gpt
             }
 
             List<GptPartitionEntry> entries = new((int)Header.NumberOfPartitionEntries);
-
             for (int i = 0; i < Header.NumberOfPartitionEntries; i++)
             {
                 Span<byte> partitionEntry = partitionBytes.Slice((int)(i * Header.SizeOfPartitionEntry), (int)Header.SizeOfPartitionEntry);
-                var entry = new GptPartitionEntry(partitionEntry, _paranoid);
+                var entry = new GptPartitionEntry(partitionEntry);
 
                 if (!entry.IsUnused)
                     entries.Add(entry);
@@ -79,6 +90,9 @@ namespace Nternal.Partitioning.Gpt
             GptPartitionEntries = entries.ToArray();
         }
 
+        /// <summary>
+        /// Yields the revision string of the EFI header.
+        /// </summary>
         public string RevisionString
         {
             get
@@ -94,11 +108,24 @@ namespace Nternal.Partitioning.Gpt
         private bool _paranoid;
         private IDataStream? _stream;
 
+        /// <summary>
+        /// Represents the main header.
+        /// </summary>
         public GptHeader? MainHeader { get; private set; }
+
+        /// <summary>
+        /// Represents the backup header.
+        /// </summary>
         public GptHeader? BackupHeader { get; private set; }
 
+        /// <summary>
+        /// Represents all GPT partitions on this disk.
+        /// </summary>
         public GptPartitionEntry[] GptPartitionEntries { get; private set; } = [];
 
+        /// <summary>
+        /// Represents the GPT header to be used.
+        /// </summary>
         public GptHeader Header => MainHeader ?? BackupHeader ?? throw new Exception("No valid GPT-Header has been parsed yet!");
     }
 }

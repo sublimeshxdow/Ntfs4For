@@ -4,6 +4,9 @@ using System.Diagnostics;
 
 namespace Nternal.Core
 {
+    /// <summary>
+    /// Represents a stream used for reading from a physical device or a logical partition.
+    /// </summary>
     public sealed class RawDriveStream : IDataStream
     {
         private readonly string _path;
@@ -20,6 +23,10 @@ namespace Nternal.Core
         /// <returns>A wrapper object for the designated device stream, which supports unaligned reading.</returns>
         private UnalignedDataStream FallbackAlignerStream { get; }
 
+        /// <summary>
+        /// Creates a stream that can be used to read from the specified device.
+        /// </summary>
+        /// <param name="devicePath">The path of the device.</param>
         public RawDriveStream(string devicePath)
         {
             _path = devicePath;

@@ -4,32 +4,64 @@ using System.Text;
 
 namespace Nternal.Partitioning.Gpt
 {
+    /// <summary>
+    /// This enum represents a non-exhaustive list of most (known) flags a GPT partitions can have.
+    /// </summary>
     [Flags]
     public enum GptPartitionFlags : ulong
     {
         None = 0,
 
-        // ---- Universal (UEFI spec, any partition type) ----
-        /// <summary>Partition is required for the platform to function; must not be removed/modified.</summary>
+        // ---------------------------------------------------------------
+        //         UEFI standard attributes (all partition types)
+        // ---------------------------------------------------------------
+
+        /// <summary>The platform needs this partition to function, so it shouldn’t be deleted or modified.</summary>
         RequiredPartition = 1UL << 0,
-        /// <summary>Firmware must NOT produce an EFI_BLOCK_IO_PROTOCOL for this partition.</summary>
+
+        /// <summary>The EFI firmware should not create a Block IO protocol for this partition.</summary>
         NoBlockIoProtocol = 1UL << 1,
-        /// <summary>
-        /// Hint for legacy PC-AT BIOS bootloaders that this partition may be
-        /// bootable. A conformant UEFI boot manager MUST ignore this bit.
-        /// </summary>
+
+        /// <summary>The equivalent to the MBR “active” flag, used by legacy/BIOS boot loaders.</summary>
         LegacyBiosBootable = 1UL << 2,
 
-        // Bits 3-47: reserved by the UEFI spec, must be zero.
+        // ---------------------------------------------------------------
+        // Microsoft Basic Data partition
+        // Type GUID: EBD0A0A2-B9E5-4433-87C0-68B6B72699C7 (winioctl.h)
+        // ---------------------------------------------------------------
 
-        // ---- Microsoft Basic Data Partition-specific (bits 48-63 range) ----
-        // Only valid when PartitionTypeGuid is the Basic Data Partition GUID.
+        /// <summary>Service partition.</summary>
+        MsBasicDataService = 1UL << 57,
 
-        /// <summary>Volume is read-only. Only meaningful for Basic Data Partitions.</summary>
-        MsftReadOnly = 1UL << 60,
-        /// <summary>Volume is hidden. Only meaningful for Basic Data Partitions.</summary>
-        MsftHidden = 1UL << 62,
-        /// <summary>OS must not auto-assign a drive letter. Only meaningful for Basic Data Partitions.</summary>
-        MsftNoDriveLetter = 1UL << 63,
+        /// <summary>Direct access (DAX) volume.</summary>
+        MsBasicDataDax = 1UL << 58,
+
+        /// <summary>Volume is offline.</summary>
+        MsBasicDataOffline = 1UL << 59,
+
+        /// <summary>Read-only volume.</summary>
+        MsBasicDataReadOnly = 1UL << 60,
+
+        /// <summary>Shadow copy of another partition.</summary>
+        MsBasicDataShadowCopy = 1UL << 61,
+
+        /// <summary>Hidden volume.</summary>
+        MsBasicDataHidden = 1UL << 62,
+
+        /// <summary>Do not assign a drive letter.</summary>
+        MsBasicDataNoDriveLetter = 1UL << 63,
+
+        // ---------------------------------------------------------------
+        //      Linux / systemd Discoverable Partitions Specification
+        // ---------------------------------------------------------------
+
+        /// <summary>Grow the file system to fill the partition.</summary>
+        SystemdGrowFs = 1UL << 59,
+
+        /// <summary>Mount read-only.</summary>
+        SystemdReadOnly = 1UL << 60,
+
+        /// <summary>Do not auto-mount / auto-activate.</summary>
+        SystemdNoAuto = 1UL << 63
     }
 }

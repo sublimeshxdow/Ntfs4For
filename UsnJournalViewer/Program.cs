@@ -55,7 +55,7 @@ namespace UsnJournalViewer
         {
             try
             {
-                using var stream = new RawDriveStream(ResolveDevicePath(source));
+                using var stream = new RawDriveStream(ParentPathCache.ResolveDevicePath(source));
                 using var volume = new NtfsVolume(stream);
                 volume.Mount(loadMftIntoMemory: true);
 
@@ -97,14 +97,14 @@ namespace UsnJournalViewer
                         case BasicUsnEntry basic:
                             string path = $"{paths.Get(basic.ParentFileReference)}/{basic.FileName}";
                             Console.WriteLine($"{basic.TimeStamp,-24:yyyy-MM-dd HH:mm:ss.fff}{basic.Usn,14:N0}  " +
-                                              $"#{basic.FileReference.FileRecordId,-11}{FormatReason(basic.Reason),-40}{path}");
+                                              $"#{basic.FileReference.FileRecordId,-11}{ParentPathCache.FormatReason(basic.Reason),-40}{path}");
                             break;
 
                         case ExtentUsnEntry extent:
                             // V4 records track which byte ranges changed; they carry no name or timestamp.
                             string ranges = string.Join(", ", extent.Extents.Take(3).Select(x => $"{x.Offset:N0}+{x.Length:N0}"));
                             Console.WriteLine($"{"(range record)",-24}{extent.Usn,14:N0}  " +
-                                              $"#{extent.FileReference.FileRecordId,-11}{FormatReason(extent.Reason),-40}{ranges}" +
+                                              $"#{extent.FileReference.FileRecordId,-11}{ParentPathCache.FormatReason(extent.Reason),-40}{ranges}" +
                                               (extent.Extents.Length > 3 ? ", ..." : ""));
                             break;
                     }
@@ -127,54 +127,6 @@ namespace UsnJournalViewer
             }
 
             return false;
-        }
-
-        /// <summary>
-        /// Journal entries only store the parent folder's reference, so resolve (and remember) folder paths.
-        /// If the folder was deleted or its record reused since, the path can't be recovered - show the record id instead.
-        /// </summary>
-        private sealed class ParentPathCache(NtfsVolume volume)
-        {
-            private readonly Dictionary<FileReference, string> _cache = new();
-
-            public string Get(FileReference parent)
-            {
-                if (_cache.TryGetValue(parent, out var path))
-                    return path;
-
-                try
-                {
-                    path = volume.GetPrimaryAbsolutePath(parent);
-                    if (path.StartsWith("??"))
-                        path = $"<#{parent.FileRecordId}>";
-                }
-
-                catch
-                {
-                    path = $"<#{parent.FileRecordId}>";
-                }
-
-                _cache[parent] = path;
-                return path;
-            }
-        }
-
-        private static string FormatReason(UsnReason reason)
-        {
-            // Drop "Close" from the display, it is on nearly every final record and just adds noise
-            var withoutClose = reason & ~UsnReason.Close;
-            string text = withoutClose == 0 ? "" : withoutClose.ToString().Replace(", ", "|");
-            if (reason.HasFlag(UsnReason.Close))
-                text += text.Length > 0 ? " (closed)" : "Close";
-            return text;
-        }
-
-        private static string ResolveDevicePath(string source)
-        {
-            if (OperatingSystem.IsWindows() && source.TrimEnd(':').Length == 1 && char.IsLetter(source[0]))
-                return $@"\\.\{char.ToUpperInvariant(source[0])}:";
-
-            return source;
         }
     }
 }

@@ -2,6 +2,9 @@
 
 namespace Nternal.Partitioning
 {
+    /// <summary>
+    /// Represents a partition that can be read from.
+    /// </summary>
     public class PartitionStream : IDataStream
     {
         public long Length => (long)(Entry.InclusiveEndingLba - Entry.StartingLba + 1) * Alignment;
@@ -11,6 +14,11 @@ namespace Nternal.Partitioning
         private IDataStream Underlying { get; }
         private IPartitionEntry Entry { get; }
 
+        /// <summary>
+        /// Creates a new stream of a partition that can be read from.
+        /// </summary>
+        /// <param name="underlying">The underlying stream of the full device.</param>
+        /// <param name="partition">The partition entry to create a stream for.</param>
         public PartitionStream(IDataStream underlying, IPartitionEntry partition)
         {
             Underlying = underlying;

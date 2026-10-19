@@ -7,6 +7,12 @@ namespace Nternal.Partitioning.Mbr
     public class MasterBootRecord
     {
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring as nullable.
+        /// <summary>
+        /// Represents a MBR (Master Boot Record). The MBR is located on the first sector of a disk, and contains at most 4 partition entries.
+        /// It mostly has been superseded by the partitioning scheme GPT (Guid Partition Table).
+        /// </summary>
+        /// <param name="drive"></param>
+        /// <param name="paranoid"></param>
         public MasterBootRecord(IDataStream drive, bool paranoid = true)
         {
             Underlying = drive;
@@ -53,7 +59,13 @@ namespace Nternal.Partitioning.Mbr
 
         public MbrPartitionEntry[] PartitionEntries { get; } = new MbrPartitionEntry[NumberOfBootEntries];
 
+        /// <summary>
+        /// Whether the underlying disk belongs to a GPT partition scheme (which should be used instead).
+        /// </summary>
         public bool IsGptProtective => PartitionEntries.Any(p => p.PartitionType == MbrPartitionType.GptProtective);
+        /// <summary>
+        /// Whether this MBR may be considered valid.
+        /// </summary>
         public bool IsValid => BootSignature == ExpectedBootSignature;
 
         public ushort BootSignature { get; private set; }

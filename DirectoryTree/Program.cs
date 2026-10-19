@@ -3,6 +3,7 @@ using Nternal.Attributes;
 using Nternal.Core;
 using Nternal.Ntfs;
 using Nternal.Structs;
+using System.Diagnostics;
 
 namespace DirectoryTree
 {

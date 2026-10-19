@@ -6,9 +6,17 @@ using Nternal.Core.Streams;
 
 namespace Nternal.Partitioning.Gpt
 {
+    /// <summary>
+    /// Represents a GPT-styled partition entry.
+    /// </summary>
     public readonly struct GptPartitionEntry : IPartitionEntry
     {
-        public GptPartitionEntry(ReadOnlySpan<byte> buffer, bool paranoid)
+        /// <summary>
+        /// Constructs a partition entry from a series of bytes.
+        /// </summary>
+        /// <param name="buffer">The bytes to interpret as partition entry.</param>
+        /// <exception cref="InvalidDataException">Thrown if the specified input buffer does not contain enough bytes to be a valid partition entry.</exception>
+        public GptPartitionEntry(ReadOnlySpan<byte> buffer)
         {
             if (buffer.Length < MinimumEntrySize)
                 throw new InvalidDataException(
@@ -19,9 +27,14 @@ namespace Nternal.Partitioning.Gpt
             StartingLba = buffer.ReadUInt64(32);
             InclusiveEndingLba = buffer.ReadUInt64(40);
             Flags = (GptPartitionFlags)buffer.ReadUInt64(48);
-            Name = buffer.ReadUnicodeString(56, 72, paranoid);
+            Name = buffer.ReadUnicodeString(56, 72, false);
         }
-        
+
+        /// <summary>
+        /// Creates a stream representing the partition defined by this partition entry.
+        /// </summary>
+        /// <param name="underlying">A stream representing the underlying disk.</param>
+        /// <returns>A stream representing the respective partition.</returns>
         public PartitionStream CreatePartitionStream(IDataStream underlying)
         {
             ArgumentNullException.ThrowIfNull(underlying);

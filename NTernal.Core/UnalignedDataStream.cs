@@ -2,6 +2,9 @@ using Nternal.Core.Streams;
 
 namespace Nternal.Core;
 
+/// <summary>
+/// Represents a pseudo-stream encapsulating another stream which does not support individual byte-by-byte reads.
+/// </summary>
 public class UnalignedDataStream : IDataStream
 {
     public long Length => _source.Length;
@@ -11,6 +14,11 @@ public class UnalignedDataStream : IDataStream
     private IDataStream _source { get; }
     private bool _leaveOpen;
 
+    /// <summary>
+    /// Creates a new stream supporting reads the underlying stream might not support due to alignment issues.
+    /// </summary>
+    /// <param name="underlying">The stream that should be encapsulated.</param>
+    /// <param name="leaveOpen">Whether the underlying stream should be disposed alongside this instance.</param>
     public UnalignedDataStream(IDataStream underlying, bool leaveOpen = false)
     {
         _source = underlying;

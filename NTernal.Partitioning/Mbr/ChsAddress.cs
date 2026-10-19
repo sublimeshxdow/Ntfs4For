@@ -4,8 +4,16 @@ using System.Text;
 
 namespace Nternal.Partitioning.Mbr
 {
+    /// <summary>
+    /// Represents a location within an HDD on a CHS (Cylinder-Head-Sector) - basis.
+    /// </summary>
     public struct ChsAddress
     {
+        /// <summary>
+        /// Constructs a new CHS-Entry based on the given bytes.
+        /// </summary>
+        /// <param name="bytes">The CHS-bytes to construct the entry from.</param>
+        /// <exception cref="ArgumentException">Throws if the passed buffer is not exactly 3 bytes large.</exception>
         public ChsAddress(ReadOnlySpan<byte> bytes)
         {
             if (bytes.Length != 3)

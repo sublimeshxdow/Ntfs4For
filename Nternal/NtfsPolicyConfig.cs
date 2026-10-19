@@ -11,7 +11,8 @@ public class NtfsPolicyConfig
         ValidateSdh = 0x00000008,
         ValidateSequenceNumbers = 0x00000010,
         ValidateSequenceNumbersInternal = 0x00000020,
-        DenyUnusedMftRecords = 0x00000040
+        DenyUnusedMftRecords = 0x00000040,
+        Disable8dot3LegacyMode = 0x00000080
     }
 
     public static bool ListPosixFileNames { get; set; } = true;

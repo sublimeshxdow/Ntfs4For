@@ -1,11 +1,14 @@
 <Solution>
   <Folder Name="/Examples/">
-    <Project Path="MftExporter/MftExporter.csproj" Id="b3d53016-665a-49f8-9528-c7ba826fede5" />
+    <File Path="Disclaimer.txt" />
+    <Project Path="DeletedFileRecovery/DeletedFileRecovery.csproj" />
     <Project Path="DirectoryTree/DirectoryTree.csproj" />
     <Project Path="FileExtractor/FileExtractor.csproj" />
     <Project Path="FileInspector/FileInspector.csproj" />
+    <Project Path="MftExporter/MftExporter.csproj" Id="b3d53016-665a-49f8-9528-c7ba826fede5" />
+    <Project Path="PartitionViewer/PartitionViewer.csproj" Id="9bf81d68-443f-49cb-a0f0-f00aafab3ce8" />
+    <Project Path="SymlinkViewer/SymlinkViewer.csproj" Id="590fd01d-187e-472e-836c-9565fb79012f" />
     <Project Path="UsnJournalViewer/UsnJournalViewer.csproj" />
-    <Project Path="DeletedFileRecovery/DeletedFileRecovery.csproj" />
     <Project Path="VolumeInfo/VolumeInfo.csproj" />
   </Folder>
   <Project Path="NTernal.Core/Nternal.Core.csproj" Id="bd827fda-3465-439d-8d17-7e7dfee51126" />

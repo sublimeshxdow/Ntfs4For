@@ -4,9 +4,15 @@ using System.Text;
 
 namespace Nternal.Partitioning.Mbr
 {
+    /// <summary>
+    /// Represents the type of partition an MBR partition may be defined as.
+    /// </summary>
     public enum MbrPartitionType : byte
     {
         // ---- Empty / structural ----
+        /// <summary>
+        /// An empty partition.
+        /// </summary>
         Empty = 0x00,
         Extended_CHS = 0x05,
         Extended_LBA = 0x0F,
@@ -156,17 +162,13 @@ namespace Nternal.Partitioning.Mbr
     public static class MbrPartitionTypeExtensions
     {
         /// <summary>
-        /// True for the two type bytes that denote an extended partition
-        /// (a pointer to a chained EBR, not a real data partition).
+        /// True for the two type bytes that denote an extended partition - (a pointer to a chained EBR, not a real data partition).
         /// </summary>
         public static bool IsExtended(this MbrPartitionType type) =>
-            type is MbrPartitionType.Extended_CHS
-                 or MbrPartitionType.Extended_LBA
-                 or MbrPartitionType.ExtendedLinux;
+            type is MbrPartitionType.Extended_CHS or MbrPartitionType.Extended_LBA or MbrPartitionType.ExtendedLinux;
 
         /// <summary>
-        /// True if this entry's presence signals the disk should actually
-        /// be interpreted as GPT, not MBR -- the classic "protective MBR" case.
+        /// True if this entry's presence indicates the disk's scheme should be interpreted as GPT instead of MBR.
         /// </summary>
         public static bool IsGptProtective(this MbrPartitionType type) =>
             type == MbrPartitionType.GptProtective;
