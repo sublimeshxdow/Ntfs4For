@@ -15,24 +15,51 @@ using Nternal.Ntfs.NtfsExtensions.Journal;
 using Nternal.Structs;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Nternal.Ntfs.Exceptions;
 
 namespace Nternal
 {
+    /// <summary>
+    /// Represents a logical Ntfs Volume.
+    /// This class provides functionality for interacting with the NTFS file system.
+    /// It supports enumerating files, querying raw Ntfs Attributes, reading from files, and a lot more.
+    /// </summary>
     public sealed partial class NtfsVolume : IDisposable
     {
         private IDataStream _provider;
-
+        
+        /// <summary>
+        /// Represents the Boot Sector of the volume.
+        /// Contains important filesystem-relevant data such as sector/cluster sizes, offset to the $Mft, etc.
+        /// </summary>
         public NtfsBootSector BootSector { get; private set; }
+        /// <summary>
+        /// Represents the collation-handler used for comparing when interacting with Index Attributes.
+        /// </summary>
         public CollationHandler CollationHandler { get; private set; }
-
-        private DataRun[] _cachedBadRanges;
-        private BitmapAttribute _rawClusterMap;
-
+        
+        /// <summary>
+        /// Contains ranges of bad clusters, if cached.
+        /// </summary>
+        private DataRun[]? _cachedBadRanges;
+        
+        /// <summary>
+        /// Contains the cluster map of this volume, if cached.
+        /// </summary>
+        private BitmapAttribute? _rawClusterMap;
+        
+        /// <summary>
+        /// Creates a new instance of an NtfsVolume.
+        /// </summary>
+        /// <param name="dataProvider">The stream representing the underlying partition.</param>
         public NtfsVolume(IDataStream dataProvider)
         {
             _provider = dataProvider;
         }
-
+        
+        /// <summary>
+        /// Releases all unmanaged resources used by this instance.
+        /// </summary>
         public void Dispose()
         {
             if (_isMounted)
@@ -41,7 +68,12 @@ namespace Nternal
                 mftStream.Dispose();
             }
         }
-
+        
+        /// <summary>
+        /// Attempts to mount the volume, enabling this instance to interpret the filesystem of the underlying partition.
+        /// </summary>
+        /// <param name="loadMftIntoMemory">Whether the Master-File-Table ($Mft) should be loaded into memory. This will cause the mounting times to increase drastically, but querying individual files may become faster at a large scale.</param>
+        /// <exception cref="Exception">Thrown when the $Mft could not be loaded correctly. This should never be the case on a healthy Ntfs-Volume.</exception>
         public void Mount(bool loadMftIntoMemory = true)
         {
             CollationHandler = new();
@@ -59,7 +91,7 @@ namespace Nternal
 
             VolumeBitmapFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Volume);
             RootFolder = GetKnownNtfsFileUnsafe(KnownMftRecord.Root);
-            SetupUpcaseTable();
+            SetupUpCaseTable();
 
             VolumeClusterFile = GetKnownNtfsFileUnsafe(KnownMftRecord.BadClus);
             VolumeBitmapFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Bitmap);
@@ -68,9 +100,26 @@ namespace Nternal
             VolumeFile = GetKnownNtfsFileUnsafe(KnownMftRecord.Volume);
             _isMounted = true;
         }
-
-        public UsnJournalReader GetJournalReader() => new UsnJournalReader(GetNtfsFile("/$Extend/$UsnJrnl"));
-
+        
+        /// <summary>
+        /// Returns the UsnJournalReader for this volume.
+        /// </summary>
+        /// <returns>The UsnJournalReader, or null, if the journal could not be found.</returns>
+        public UsnJournalReader? GetJournalReader()
+        {
+            try
+            {
+                return new UsnJournalReader(GetNtfsFile("/$Extend/$UsnJrnl"));
+            }
+            catch (FileNotFoundException ex)
+            {
+                return null;
+            }
+        }
+        
+        /// <summary>
+        /// Parses the boot sector.
+        /// </summary>
         private void ParseBootSector()
         {
             Span<byte> bootSector = stackalloc byte[NtfsBootSector.BootSectorSize];
@@ -78,8 +127,15 @@ namespace Nternal
 
             BootSector = new(bootSector);
         }
-
-        private void SetupUpcaseTable()
+        
+        /// <summary>
+        /// Parses $UpCase so the collation handler can compare file-names correctly.
+        /// </summary>
+        /// <exception cref="InvalidDataException">Thrown if the main stream of $UpCase is of invalid length. This usually entails corruption.</exception>
+        /// <exception cref="NotImplementedException">[Iff NtfsPolicyConfig:ValidateUpCase] Thrown if the corresponding $Info stream is non-resident. This function will be updated once this is no longer the case.</exception>
+        /// <exception cref="Exception">[Iff NtfsPolicyConfig:ValidateUpCase] Thrown if the $Info stream is of unexpected length. Again, this function will be updated if this stream's size changes.</exception>
+        /// <exception cref="ChecksumVerificationFailedException">[Iff NtfsPolicyConfig:ValidateUpCase] Thrown if the checksum of the UpCase-Table does not match the one stored within the $Info stream.</exception>
+        private void SetupUpCaseTable()
         {
             const int Utf16CharCount = 65536, Utf16ByteCount = Utf16CharCount * 2;
 
@@ -99,7 +155,7 @@ namespace Nternal
                 .GetStream();
 
             if (upcaseInfoStream != null
-                && NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ValidateUpcase))
+                && NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ValidateUpCase))
             {
                 if (!upcaseInfoStream.TryGetMemory(out var upcaseInfo))
                     throw new NotImplementedException($"$UpCase:$Info is expected to always be resident!");
@@ -112,18 +168,30 @@ namespace Nternal
                 ulong calculatedChecksum = RtlCrc64Nvme.Compute(tableBuffer);
 
                 if (writtenChecksum != calculatedChecksum)
-                    throw new InvalidDataContractException(
+                    throw new ChecksumVerificationFailedException(
                         $"$UpCase validation failed - written checksum {writtenChecksum.ToString("X16")}" +
                         $" does not match computed checksum {calculatedChecksum.ToString("X16")}!");
             }
         }
         
+        /// <summary>
+        /// Yields an enumerable object that allows enumerating entries of the specified directory.
+        /// </summary>
+        /// <param name="path">The path of the folder to enumerate.</param>
+        /// <returns>The enumerable object.</returns>
+        /// /// <exception cref="ArgumentException">Thrown if the specified file reference does not reference a directory.</exception>
         public IEnumerable<FolderEntry> EnumerateDirectory(string path)
         {
             EnsureIsMounted();
             return EnumerateDirectory(GetNtfsFile(path).GetReference());
         }
-
+        
+        /// <summary>
+        /// Yields an enumerable object that allows enumerating entries of the specified directory.
+        /// </summary>
+        /// <param name="folder">A file reference to the folder to enumerate.</param>
+        /// <returns>The enumerable object.</returns>
+        /// /// <exception cref="ArgumentException">Thrown if the specified file reference does not reference a directory.</exception>
         public IEnumerable<FolderEntry> EnumerateDirectory(FileReference folder)
         {
             EnsureIsMounted();
@@ -135,7 +203,12 @@ namespace Nternal
             foreach (var entry in index.EnumerateEntries())
                 yield return new FolderEntry(entry.GetI30MftReference()!.Value, entry.GetKey());
         }
-
+        
+        /// <summary>
+        /// Returns ranges of bad (damaged) clusters as data runs.
+        /// </summary>
+        /// <returns>The data runs representing bad clusters.</returns>
+        /// <exception cref="InvalidDataException">Thrown if $BadClus:$Bad [the stream used for finding bad clusters] is non-resident. This may never happend, and usually entails corruption.</exception>
         public DataRun[] GetBadClusterRanges()
         {
             EnsureIsMounted();
@@ -155,7 +228,13 @@ namespace Nternal
 
             return badClusters.ToArray();
         }
-
+        
+        /// <summary>
+        /// Queries the state of the specified cluster.
+        /// </summary>
+        /// <param name="cluster">The cluster to query the state for.</param>
+        /// <returns>The state of the queried cluster.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">The specified cluster does not reside within this volume.</exception>
         public ClusterState GetClusterState(long cluster)
         {
             EnsureIsMounted();
@@ -175,7 +254,13 @@ namespace Nternal
 
             return state;
         }
-
+        
+        /// <summary>
+        /// Returns whether the given cluster is currently used/reserved for any file.
+        /// </summary>
+        /// <param name="cluster">The cluster to query the allocation status for.</param>
+        /// <returns>Whether the specified cluster is in use.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">The specified cluster does not reside within this volume.</exception>
         public bool IsClusterUsed(long cluster)
         {
             EnsureIsMounted();
@@ -185,12 +270,23 @@ namespace Nternal
 
             return ClusterMap.IsSet(cluster);
         }
-
+        
+        /// <summary>
+        /// Yields the underlying data stream of the partition.
+        /// </summary>
+        /// <returns></returns>
         internal IDataStream GetUnderlyingStream() => _provider;
-
+        
+        /// <summary>
+        /// Whether the $Mft has been parsed yet.
+        /// </summary>
         private bool _hasParsedMftYet = false;
+        /// <summary>
+        /// Whether the volume has been mounted already (Mount() has been called).
+        /// </summary>
         private bool _isMounted = false;
-
+        
+        // Begin of Ntfs Meta Files
         internal NtfsFile? MftFile { get; set; }
         
         private NtfsFile VolumeClusterFile { get; set; }
@@ -199,11 +295,16 @@ namespace Nternal
         private NtfsFile? UpcaseFile { get; set; }
         private NtfsFile? VolumeFile { get; set; }
         private NtfsFile? VolumeBitmapFile { get; set; }
-
-        // private Dictionary<KnownMftRecord, NtfsFile> NtfsMetaFiles { get; set; } = new(12);
-
+        // End of Ntfs Meta Files
+        
+        /// <summary>
+        /// Holds the bitmap index of $Mft.
+        /// </summary>
         private BitmapIndex? MftBitmap { get; set; }
-
+        
+        /// <summary>
+        /// An array of runs representing bad cluster ranges.
+        /// </summary>
         private DataRun[] BadClusterRanges
         {
             get
@@ -214,7 +315,10 @@ namespace Nternal
                 return _cachedBadRanges;
             }
         }
-
+        
+        /// <summary>
+        /// The cluster map of this volume.
+        /// </summary>
         private BitmapAttribute? ClusterMap
         {
             get
@@ -223,7 +327,7 @@ namespace Nternal
 
                 if (_rawClusterMap == null)
                 {
-                    var bitmap = VolumeBitmapFile.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
+                    var bitmap = VolumeBitmapFile!.GetRequiredAttributeData<DataAttribute>(NtfsAttributeType.Data, "");
                     _rawClusterMap = new BitmapAttribute()
                     {
                         Underlying = bitmap.Underlying
@@ -234,7 +338,11 @@ namespace Nternal
                 return _rawClusterMap;
             }
         }
-
+        
+        /// <summary>
+        /// Safety check for ensuring the volume is mounted.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The volume has not been mounted yet.</exception>
         private void EnsureIsMounted()
         {
             if (!_isMounted)

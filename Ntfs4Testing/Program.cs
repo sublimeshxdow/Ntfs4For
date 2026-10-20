@@ -22,8 +22,28 @@ using Nternal.Structs;
 
 internal class Program
 {
+    /// <summary>
+    /// I use this for testing my library, you should not rely on this code.
+    /// </summary>
+    /// <param name="args">Arguments passed via cli interface.</param>
     private static void Main(string[] args)
     {
+        using var rawStream = new RawDriveStream("/dev/nvme0n1p3");
+        using var drive = new NtfsVolume(rawStream);
+        drive.Mount();
+
+        foreach (var entry in drive.EnumerateIndexedSymLinks())
+        {
+            if (entry.Tag.HasFlag(ReparseTag.SymbolicLink))
+            {
+                var file = drive.GetNtfsFile(entry.Reference);
+                var reparseInfo = file.GetAttributeData<ReparseAttribute>();
+                if (reparseInfo?.Data is SymbolicLinkReparseData sym)
+                    Console.WriteLine(sym.PrintName);
+            }
+        }
+        return;
+        
         char[] letters = ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'N'];
 
         Parallel.ForEach(letters, new ParallelOptions() { MaxDegreeOfParallelism = 8 }, letter =>
@@ -48,7 +68,7 @@ internal class Program
         //NtfsPolicyConfig.PolicyFlags ^= NtfsPolicyConfig.Flags.ValidateSequenceNumbers;
 
 
-        Console.WriteLine($"Name={v.VolumeLabel} Version={v.VolumeVersion} Flags={v.VolumeFlags}");
+        Console.WriteLine($"Name={v.VolumeLabel} Version={v.NtfsVersion} Flags={v.VolumeFlags}");
         long processed = 0;
 
         Stopwatch s = new();

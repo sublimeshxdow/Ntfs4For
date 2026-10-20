@@ -8,6 +8,9 @@ public partial class NtfsVolume
     private string? _volumeVersion;
     private VolumeFlags? _volumeFlags;
     
+    /// <summary>
+    /// Represents the volume label of this volume.
+    /// </summary>
     public string VolumeLabel
     {
         get
@@ -16,8 +19,11 @@ public partial class NtfsVolume
             return _volumeLabel!;
         }
     }
-
-    public string VolumeVersion
+    
+    /// <summary>
+    /// Represents the Ntfs version of the underlying file system.
+    /// </summary>
+    public string NtfsVersion
     {
         get
         {
@@ -25,7 +31,10 @@ public partial class NtfsVolume
             return _volumeVersion!;
         }
     }
-
+    
+    /// <summary>
+    /// Represents the currently set volume flags.
+    /// </summary>
     public VolumeFlags VolumeFlags
     {
         get
@@ -34,7 +43,10 @@ public partial class NtfsVolume
             return _volumeFlags!.Value;
         }
     }
-
+    
+    /// <summary>
+    /// Loads relevant members for the fields above.
+    /// </summary>
     private void EnsureVolumeInformationIsLoaded()
     {
         EnsureIsMounted();

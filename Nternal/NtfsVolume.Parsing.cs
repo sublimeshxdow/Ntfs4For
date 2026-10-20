@@ -19,6 +19,18 @@ namespace Nternal
 {
     public partial class NtfsVolume
     {
+        /// <summary>
+        /// Returns the raw record referenced by the specified file reference.
+        /// </summary>
+        /// <param name="reference">The reference to the file record.</param>
+        /// <param name="isAttributeLookup">Whether this function is called for the purpose of looking up foreign attributes referenced via $Attribute_List.</param>
+        /// <param name="compareSequence">Whether to verify the file record's sequence number.</param>
+        /// <param name="mft">[Bootstrapping] Represents the $Mft-stream to read the record from. Required in early stages of mounting the volume.</param>
+        /// <returns>The raw file record.</returns>
+        /// <exception cref="InvalidOperationException">Thrown if a fatal, internal error occured during parsing the referenced file record.</exception>
+        /// <exception cref="Exception">Thrown if a fatal, internal error occured during parsing the referenced file record.</exception>
+        /// <exception cref="InvalidDataException">Thrown if the referenced file record could not be parsed.</exception>
+        /// <exception cref="ArgumentException">Thrown when mismatch between the reference & record's sequence numbers has been detected.</exception>
         internal RawFileRecord GetRawRecordData(FileReference reference, bool isAttributeLookup = false,
             bool compareSequence = true, IDataStream? mft = null)
         {
@@ -69,24 +81,27 @@ namespace Nternal
 
             return rawRecord;
         }
-
-        public NtfsFile ParseFile(FileReference reference)
+        
+        private void ParseMft(bool fixup = true, bool postXp = true)
         {
-            EnsureIsMounted();
-            var raw = GetRawRecordData(reference);
-            return new NtfsFile(raw, _provider, this, reference.FileRecordId);
-        }
-
-        private void ParseMft(bool paranoid = true, bool fixup = true, bool postXp = true)
-        {
-            var raw = GetMftRecord(paranoid, fixup);
+            var raw = GetMftRecord(fixup);
             MftFile = new NtfsFile(raw, _provider, this, (ulong)KnownMftRecord.Mft, postXp);
             _hasParsedMftYet = true;
         }
-
+        
+        /// <summary>
+        /// Converts a known $Mft record index to a file reference.
+        /// </summary>
+        /// <param name="record">An enum value representing the $Mft record to be queried.</param>
+        /// <returns>Returns the respective file reference.</returns>
         public FileReference GetKnownMftReference(KnownMftRecord record)
             => new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
-
+        
+        /// <summary>
+        /// Returns a known [& fixed] Ntfs file.
+        /// </summary>
+        /// <param name="record">An enum value representing the $Mft record to be queried.</param>
+        /// <returns>The queried Ntfs file entry.</returns>
         public NtfsFile GetKnownNtfsFile(KnownMftRecord record)
         {
             EnsureIsMounted();
@@ -95,25 +110,41 @@ namespace Nternal
 
         private NtfsFile GetKnownNtfsFileUnsafe(KnownMftRecord record)
             => GetNtfsFileUnsafe(GetKnownMftReference(record), true);
-
+        
+        /// <summary>
+        /// Returns the Ntfs file object referenced by the specified reference.
+        /// </summary>
+        /// <param name="reference">The file reference.</param>
+        /// <param name="compareSequence">Whether the sequence number should be verified.</param>
+        /// <returns>The respective Ntfs file.</returns>
         public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
         {
             EnsureIsMounted();
             return GetNtfsFileUnsafe(reference, compareSequence);
         }
-
+        
         private NtfsFile GetNtfsFileUnsafe(FileReference reference, bool compareSequence = true)
         {
             var rawRecord = GetRawRecordData(reference, isAttributeLookup: false, compareSequence: compareSequence);
             return new NtfsFile(rawRecord, _provider, this, reference.FileRecordId, true);
         }
-
+        
+        /// <summary>
+        /// Yields the amount of $Mft records on this volume. 
+        /// </summary>
+        /// <returns></returns>
         public long GetMftRecordCount()
         {
             EnsureIsMounted();
             return MftFile!.GetDataStream().Length / BootSector.FileRecordSize;
         }
-
+        
+        /// <summary>
+        /// Returns the primary path of the specified file reference.
+        /// </summary>
+        /// <param name="reference">The reference to the file to retrieve the primary path of.</param>
+        /// <returns>Returns the queried path.</returns>
+        /// <exception cref="IOException">Throws if the specified path cannot be resolved properly.</exception>
         public string GetPrimaryAbsolutePath(FileReference reference)
         {
             EnsureIsMounted();
@@ -146,7 +177,17 @@ namespace Nternal
 
             return sb.Length > 0 ? sb.ToString() : "/";
         }
-
+        
+        /// <summary>
+        /// Retrieves a file object representing a $Mft-Entry on this volume.
+        /// It contains base information regarding the $Mft-Record as well as the Ntfs attributes belonging to that record.
+        /// </summary>
+        /// <param name="path">The logical path of the entry to retrieve.</param>
+        /// <returns>The respective file object.</returns>
+        /// <exception cref="InvalidOperationException">Throws if the root folder's entry hasn't been initialized yet, the path is in an invalid format, or there is a file / folder mismatch.</exception>
+        /// <exception cref="ArgumentException">Throws if the specified path is invalid.</exception>
+        /// <exception cref="FileNotFoundException">Throws if the specified path could not be found.</exception>
+        /// <exception cref="NotSupportedException">Throws if the path involves symbolic links that cannot be processed.</exception>
         public NtfsFile GetNtfsFile(string path)
         {
             EnsureIsMounted();
@@ -223,7 +264,12 @@ namespace Nternal
 
             return file;
         }
-
+        
+        /// <summary>
+        /// Enumerates all indexed reparse-points on this volume.
+        /// </summary>
+        /// <returns>An enumerator object for enumerating all reparse points with the respective file references.</returns>
+        /// <exception cref="NotSupportedException">Thrown if the file indexing all reparse points [$Extend/$Reparse] is not present.</exception>
         public IEnumerable<(ReparseTag Tag, FileReference Reference)> EnumerateIndexedSymLinks()
         {
             NtfsFile file;
@@ -237,7 +283,7 @@ namespace Nternal
 
             catch (FileNotFoundException)
             {
-                yield break;
+                throw new NotSupportedException($"Cannot enumerate symbolic links, as $Extend/$Reparse is not present!");
             }
 
             foreach (var entry in index.EnumerateEntries())
@@ -248,6 +294,12 @@ namespace Nternal
             }
         }
 
+        /// <summary>
+        /// Queries the security descriptor for a given file.
+        /// </summary>
+        /// <param name="file">The file to retrieve the security descriptor for.</param>
+        /// <returns>The corresponding security descriptor.</returns>
+        /// <exception cref="InvalidDataException">[Iff NtfsPolicyConfig:ValidateSdh] Thrown if a mismatch is encountered during internal parsing.</exception>
         public SecurityDescriptor? GetSecurityDescriptor(NtfsFile file)
         {
             EnsureIsMounted();
@@ -258,7 +310,13 @@ namespace Nternal
             var index = file.GetAttributeData<StandardInformationAttribute>()?.SecurityId;
             return index != null ? LookupSecurityDescriptorByIndex(index.Value) : null;
         }
-
+        
+        /// <summary>
+        /// Retrieves a security descriptor for a given security id.
+        /// </summary>
+        /// <param name="securityId">The givens security id.</param>
+        /// <returns>The security descriptor referenced by the given security id.</returns>
+        /// <exception cref="InvalidDataException">[Iff NtfsPolicyConfig:ValidateSdh] Thrown if a mismatch is encountered during internal parsing.</exception>
         private SecurityDescriptor? LookupSecurityDescriptorByIndex(uint securityId)
         {
             EnsureIsMounted();
@@ -293,8 +351,13 @@ namespace Nternal
 
             return new SecurityDescriptor(sdsEntry[headerOffset..]);
         }
-
-        private RawFileRecord GetMftRecord(bool paranoid = true, bool fixup = true)
+        
+        /// <summary>
+        /// Returns a raw file record representing the file record header & raw attribute data.
+        /// </summary>
+        /// <param name="fixup">Whether to fixup the raw volume data.</param>
+        /// <returns>The raw file record.</returns>
+        private RawFileRecord GetMftRecord(bool fixup = true)
         {
             Span<byte> mftRecord = BootSector.FileRecordSize <= 1024
                 ? stackalloc byte[BootSector.FileRecordSize]
@@ -307,7 +370,13 @@ namespace Nternal
 
             return new RawFileRecord(mftRecord);
         }
-
+        
+        /// <summary>
+        /// Retrieves a specific index parser for a given file/folder of this volume.
+        /// </summary>
+        /// <param name="file">The file to retrieve the index for.</param>
+        /// <param name="index">The type of index to retrieve, e.g. $I30.</param>
+        /// <returns>Returns an index parser for the given file and index.</returns>
         public IndexParser CreateIndexParser(NtfsFile file, string index)
         {
             EnsureIsMounted();

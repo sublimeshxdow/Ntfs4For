@@ -34,7 +34,7 @@ namespace VolumeInfo
                 var boot = volume.BootSector;
                 Console.WriteLine($"Volume            {source}");
                 Console.WriteLine($"Label             {(volume.VolumeLabel.Length > 0 ? volume.VolumeLabel : "(none)")}");
-                Console.WriteLine($"NTFS version      {volume.VolumeVersion}");
+                Console.WriteLine($"NTFS version      {volume.NtfsVersion}");
                 Console.WriteLine($"Flags             {volume.VolumeFlags}");
                 Console.WriteLine($"Serial number     {(uint)(boot.VolumeSerialNumber >> 16) & 0xFFFF:X4}-{(uint)boot.VolumeSerialNumber & 0xFFFF:X4} (full: {boot.VolumeSerialNumber:X16})");
                 Console.WriteLine();
