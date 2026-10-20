@@ -31,8 +31,8 @@ namespace Nternal.Attributes
                     break;
 
                 ushort recordLength = buffer.ReadUInt16(4);
-
-                Debug.Assert(recordLength != 0);
+                if (recordLength == 0)
+                    throw new InvalidDataException($"An attribute list's record entry may never be of length zero!");
 
                 byte nameLength = buffer[6];
                 byte nameOffset = buffer[7];
