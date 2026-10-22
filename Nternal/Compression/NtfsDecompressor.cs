@@ -1,5 +1,5 @@
 using System.Numerics;
-using Nternal.Extensions;
+using Nternal.Core.Extensions;
 
 namespace Nternal.Ntfs.Compression;
 
@@ -26,7 +26,7 @@ public class NtfsDecompressor
             throw new InvalidDataException(
                 $"LZNT1 chunk requires at least 2 bytes for the header, got {source.Length}.");
 
-        ushort header = source.ReadUInt16(0);
+        var header = source.ReadUInt16();
 
         // zero-header => stop
         if (header == 0)
@@ -36,8 +36,8 @@ public class NtfsDecompressor
             throw new InvalidDataException(
                 $"Invalid compression header signature (expected 011, got {(header >> 12) & 0x07:X}).");
 
-        bool compressed = (header & 0x8000) != 0;
-        ushort payloadLength = (ushort)((header & 0xFFF) + 1);
+        var compressed = (header & 0x8000) != 0;
+        var payloadLength = (ushort)((header & 0xFFF) + 1);
         sourceBytesProcessed = 2 + payloadLength;
 
         if (source.Length < 2 + payloadLength)
@@ -71,8 +71,8 @@ public class NtfsDecompressor
                 return;
             }
 
-            byte flag = compressed[inputPosition++];
-            for (int b = 0; b < 8; b++)
+            var flag = compressed[inputPosition++];
+            for (var b = 0; b < 8; b++)
             {
                 // Check whether we are done
                 if (inputPosition >= compressed.Length)
@@ -81,7 +81,7 @@ public class NtfsDecompressor
                     return;
                 }
 
-                bool isLiteral = (flag & (1 << b)) == 0;
+                var isLiteral = (flag & (1 << b)) == 0;
 
                 // Simple literal => copy
                 if (isLiteral)
@@ -90,7 +90,7 @@ public class NtfsDecompressor
                         throw new InvalidDataException(
                             $"LZNT1 chunk decompresses beyond the destination buffer ({destination.Length} bytes) while writing a literal.");
 
-                    byte literal = compressed[inputPosition++];
+                    var literal = compressed[inputPosition++];
                     destination[outputPosition++] = literal;
                 }
 
@@ -101,19 +101,19 @@ public class NtfsDecompressor
                         throw new InvalidDataException(
                             "LZNT1 chunk ends mid-way through a back-reference symbol (need 2 bytes).");
 
-                    ushort reference = compressed.ReadUInt16(inputPosition);
+                    var reference = compressed.ReadUInt16(inputPosition);
                     inputPosition += 2;
 
-                    int exp = 4;
+                    var exp = 4;
                     if (outputPosition > 16)
                     {
-                        int bitLength = BitOperations.Log2((uint)(outputPosition - 1)) + 1;
+                        var bitLength = BitOperations.Log2((uint)(outputPosition - 1)) + 1;
                         exp = Math.Min(bitLength, 12);
                     }
 
                     int lengthBits = 16 - exp, mask = (1 << lengthBits) - 1;
                     int extractOffset = (reference >> lengthBits) + 1, extractLength = (reference & mask) + 3;
-                    int absExtractOffset = outputPosition - extractOffset;
+                    var absExtractOffset = outputPosition - extractOffset;
 
                     if (absExtractOffset < 0)
                         throw new InvalidDataException(
@@ -126,10 +126,10 @@ public class NtfsDecompressor
                             $"exceeding the destination buffer ({destination.Length} bytes).");
 
                     // Copy
-                    int remaining = extractLength;
+                    var remaining = extractLength;
                     while (remaining > 0)
                     {
-                        int toCopy = Math.Min(remaining, extractOffset);
+                        var toCopy = Math.Min(remaining, extractOffset);
                         destination.Slice(absExtractOffset, toCopy).CopyTo(destination.Slice(outputPosition));
                         outputPosition += toCopy;
                         remaining -= toCopy;

@@ -1,44 +1,18 @@
-using Nternal.Extensions;
-using System;
 using System.Security.AccessControl;
+using Nternal.Core.Extensions;
 
 namespace Nternal.Ntfs.Security;
 
 public class Ace
 {
-    public AceType Type { get; }
-    public AceFlags Flags { get; }
-    internal ushort Size { get; }
-    public FileSystemRights AccessMask { get; }
-    public Sid Sid { get; }
-
     private static readonly AceType[] ObjectAceTypes =
     {
         AceType.AccessAllowedObject,
         AceType.AccessDeniedObject,
         AceType.SystemAuditObject,
         AceType.AccessAllowedCallbackObject,
-        AceType.AccessDeniedCallbackObject,
+        AceType.AccessDeniedCallbackObject
     };
-
-    public static Ace Parse(ReadOnlySpan<byte> data, bool paranoid = true)
-    {
-        if (data.Length < 4)
-            throw new InvalidDataException($"ACE_HEADER requires 4 bytes, but only got {data.Length}!");
-
-        AceType type = (AceType)data[0];
-        ushort size = data.ReadUInt16(2);
-
-        if (paranoid && size > data.Length)
-            throw new InvalidDataException(
-                $"ACE declares Size={size}, but only {data.Length} bytes are available!");
-
-        ReadOnlySpan<byte> aceData = data[..size];
-
-        return Array.IndexOf(ObjectAceTypes, type) >= 0
-            ? new ObjectAce(aceData, paranoid)
-            : new Ace(aceData, sidOffset: 8, paranoid);
-    }
 
     protected Ace(ReadOnlySpan<byte> aceData, int sidOffset, bool paranoid)
     {
@@ -52,14 +26,35 @@ public class Ace
         AccessMask = (FileSystemRights)aceData.ReadUInt32(4);
         Sid = new Sid(aceData[sidOffset..], paranoid);
     }
+
+    public AceType Type { get; }
+    public AceFlags Flags { get; }
+    internal ushort Size { get; }
+    public FileSystemRights AccessMask { get; }
+    public Sid Sid { get; }
+
+    public static Ace Parse(ReadOnlySpan<byte> data, bool paranoid = true)
+    {
+        if (data.Length < 4)
+            throw new InvalidDataException($"ACE_HEADER requires 4 bytes, but only got {data.Length}!");
+
+        var type = (AceType)data[0];
+        var size = data.ReadUInt16(2);
+
+        if (paranoid && size > data.Length)
+            throw new InvalidDataException(
+                $"ACE declares Size={size}, but only {data.Length} bytes are available!");
+
+        var aceData = data[..size];
+
+        return Array.IndexOf(ObjectAceTypes, type) >= 0
+            ? new ObjectAce(aceData, paranoid)
+            : new Ace(aceData, 8, paranoid);
+    }
 }
 
 public sealed class ObjectAce : Ace
 {
-    public AceObjectFlags ObjectFlags { get; }
-    public Guid? ObjectType { get; }
-    public Guid? InheritedObjectType { get; }
-
     internal ObjectAce(ReadOnlySpan<byte> aceData, bool paranoid)
         : base(aceData,
             ComputeSidOffset(aceData, paranoid, out var objectFlags, out var objectType, out var inheritedObjectType),
@@ -70,6 +65,10 @@ public sealed class ObjectAce : Ace
         InheritedObjectType = inheritedObjectType;
     }
 
+    public AceObjectFlags ObjectFlags { get; }
+    public Guid? ObjectType { get; }
+    public Guid? InheritedObjectType { get; }
+
     private static int ComputeSidOffset(
         ReadOnlySpan<byte> aceData, bool paranoid,
         out AceObjectFlags objectFlags, out Guid? objectType, out Guid? inheritedObjectType)
@@ -79,7 +78,7 @@ public sealed class ObjectAce : Ace
                 $"Object ACE requires at least 12 bytes before its GUIDs, but got {aceData.Length}!");
 
         objectFlags = (AceObjectFlags)aceData.ReadUInt32(8);
-        int offset = 12;
+        var offset = 12;
 
         objectType = null;
         if (objectFlags.HasFlag(AceObjectFlags.ObjectTypePresent))

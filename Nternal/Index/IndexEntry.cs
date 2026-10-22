@@ -1,7 +1,6 @@
-using Nternal.Attributes;
-using Nternal.Extensions;
+using Nternal.Core.Extensions;
 using Nternal.Ntfs.Attributes;
-using Nternal.Structs;
+using Nternal.Ntfs.Generic;
 
 namespace Nternal.Ntfs.Index;
 
@@ -14,6 +13,22 @@ public class IndexEntry : IComparable<IndexEntry>
         IsLast = 0x0002
     }
 
+    public IndexEntry(ReadOnlyMemory<byte> fullData, IndexRootAttribute root, CollationHandler collationHandler)
+    {
+        _FullData = fullData;
+        IndexRoot = root;
+        CollationHandler = collationHandler;
+
+        EntryLength = RawData.ReadUInt16(8);
+
+        if (root.IndexedType == NtfsAttributeType.FileName)
+            FileReference = new FileReference(RawData.ReadUInt64());
+
+        Flags = (IndexFlags)RawData.ReadUInt16(12);
+        if (Flags.HasFlag(IndexFlags.HasSubnode))
+            SubnodeVcn = RawData.ReadInt64(EntryLength - 8);
+    }
+
     public IndexFlags Flags { get; }
 
     protected FileReference? FileReference { get; }
@@ -24,33 +39,8 @@ public class IndexEntry : IComparable<IndexEntry>
 
     public long? SubnodeVcn { get; }
 
-    public ReadOnlySpan<byte> GetKey()
-    {
-        var keyLength = RawData.ReadUInt16(10);
-        return RawData[16..(16 + keyLength)];
-    }
-
-    public ReadOnlySpan<byte> GetData() =>
-        RawData[RawData.ReadUInt16(0)..(RawData.ReadUInt16(0) + RawData.ReadUInt16(2))];
-
     protected IndexRootAttribute IndexRoot { get; init; }
     protected CollationHandler CollationHandler { get; init; }
-
-    public IndexEntry(ReadOnlyMemory<byte> fullData, IndexRootAttribute root, CollationHandler collationHandler)
-    {
-        _FullData = fullData;
-        IndexRoot = root;
-        CollationHandler = collationHandler;
-
-        EntryLength = RawData.ReadUInt16(8);
-
-        if (root.IndexedType == NtfsAttributeType.FileName)
-            FileReference = new FileReference(RawData.ReadUInt64(0));
-
-        Flags = (IndexFlags)RawData.ReadUInt16(12);
-        if (Flags.HasFlag(IndexFlags.HasSubnode))
-            SubnodeVcn = RawData.ReadInt64(EntryLength - 8);
-    }
 
     public int CompareTo(IndexEntry? other)
     {
@@ -67,5 +57,19 @@ public class IndexEntry : IComparable<IndexEntry>
         return CollationHandler.Compare(RawData, other.RawData, IndexRoot.CollationRule);
     }
 
-    public FileReference? GetI30MftReference() => FileReference;
+    public ReadOnlySpan<byte> GetKey()
+    {
+        var keyLength = RawData.ReadUInt16(10);
+        return RawData[16..(16 + keyLength)];
+    }
+
+    public ReadOnlySpan<byte> GetData()
+    {
+        return RawData[RawData.ReadUInt16()..(RawData.ReadUInt16() + RawData.ReadUInt16(2))];
+    }
+
+    public FileReference? GetI30MftReference()
+    {
+        return FileReference;
+    }
 }

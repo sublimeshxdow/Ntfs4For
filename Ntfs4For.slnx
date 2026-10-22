@@ -1,18 +1,24 @@
 <Solution>
   <Folder Name="/Examples/">
-    <File Path="Disclaimer.txt" />
-    <Project Path="DeletedFileRecovery/DeletedFileRecovery.csproj" />
-    <Project Path="DirectoryTree/DirectoryTree.csproj" />
-    <Project Path="FileExtractor/FileExtractor.csproj" />
-    <Project Path="FileInspector/FileInspector.csproj" />
-    <Project Path="MftExporter/MftExporter.csproj" Id="b3d53016-665a-49f8-9528-c7ba826fede5" />
-    <Project Path="PartitionViewer/PartitionViewer.csproj" Id="9bf81d68-443f-49cb-a0f0-f00aafab3ce8" />
-    <Project Path="SymlinkViewer/SymlinkViewer.csproj" Id="590fd01d-187e-472e-836c-9565fb79012f" />
-    <Project Path="UsnJournalViewer/UsnJournalViewer.csproj" />
-    <Project Path="VolumeInfo/VolumeInfo.csproj" />
+    <File Path="Examples/README.md" />
+    <Project Path="Examples/DeletedFileRecovery/DeletedFileRecovery.csproj" />
+    <Project Path="Examples/DirectoryTree/DirectoryTree.csproj" />
+    <Project Path="Examples/FileExtractor/FileExtractor.csproj" />
+    <Project Path="Examples/FileInspector/FileInspector.csproj" />
+    <Project Path="Examples/MftExporter/MftExporter.csproj" Id="b3d53016-665a-49f8-9528-c7ba826fede5" />
+    <Project Path="Examples/PartitionViewer/PartitionViewer.csproj" Id="9bf81d68-443f-49cb-a0f0-f00aafab3ce8" />
+    <Project Path="Examples/SymlinkViewer/SymlinkViewer.csproj" Id="590fd01d-187e-472e-836c-9565fb79012f" />
+    <Project Path="Examples/UsnJournalViewer/UsnJournalViewer.csproj" />
+    <Project Path="Examples/VolumeInfo/VolumeInfo.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="LICENSE.txt" />
+    <File Path="README.md" />
   </Folder>
   <Project Path="NTernal.Core/Nternal.Core.csproj" Id="bd827fda-3465-439d-8d17-7e7dfee51126" />
   <Project Path="NTernal.Partitioning/Nternal.Partitioning.csproj" Id="8dbcb69b-6ba2-4cb5-9418-bdd76a364d8d" />
   <Project Path="Nternal/Nternal.Ntfs.csproj" />
-  <Project Path="Ntfs4Testing/Ntfs4Testing.csproj" />
+  <Project Path="Ntfs4Testing/Ntfs4Testing.csproj" Id="ce19b202-6b91-4f23-b2e6-29183f3fb07b" />
 </Solution>

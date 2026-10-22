@@ -1,4 +1,4 @@
-using Nternal.Structs;
+using Nternal.Ntfs.Generic;
 
 namespace Nternal.Ntfs.NtfsExtensions.Journal;
 

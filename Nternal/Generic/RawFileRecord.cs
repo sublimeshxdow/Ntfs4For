@@ -1,11 +1,11 @@
-namespace Nternal.Structs;
+namespace Nternal.Ntfs.Generic;
 
 public class RawFileRecord : GenericFileRecord
 {
-    public byte[] AttributeData { get; }
-
     public RawFileRecord(ReadOnlySpan<byte> data) : base(data)
     {
         AttributeData = data[OffsetToAttributes..(int)AllocatedSizeOfRecord].ToArray();
     }
+
+    public byte[] AttributeData { get; }
 }

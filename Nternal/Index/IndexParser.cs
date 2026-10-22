@@ -1,30 +1,22 @@
-using System.Buffers.Binary;
-using System.Diagnostics;
-using System.Text;
-using Nternal.Attributes;
 using Nternal.Core;
-using Nternal.Core.Streams;
-using Nternal.Extensions;
-using Nternal.Helpers;
+using Nternal.Core.Extensions;
 using Nternal.Ntfs.Attributes;
-using Nternal.Streams;
-using Nternal.Structs;
+using Nternal.Ntfs.Helpers;
 
 namespace Nternal.Ntfs.Index;
 
 public class IndexParser
 {
-    internal readonly IndexRootAttribute IndexRoot;
-    internal readonly IndexAllocationAttribute? IndexAllocation;
+    private const int IndexAllocationVcnUnit = 512;
     internal readonly BitmapAttribute? Bitmap;
 
-    internal readonly bool Paranoid;
-    internal readonly CollationHandler CollationHandler;
-
     private readonly NtfsBootSector BootSector;
-    private readonly IDataStream? UnalignedIndexAllocationStream;
+    internal readonly CollationHandler CollationHandler;
+    internal readonly IndexAllocationAttribute? IndexAllocation;
+    internal readonly IndexRootAttribute IndexRoot;
 
-    private const int IndexAllocationVcnUnit = 512;
+    internal readonly bool Paranoid;
+    private readonly IDataStream? UnalignedIndexAllocationStream;
 
     public IndexParser(NtfsFile file, string index, CollationHandler handler, NtfsBootSector bootSector)
     {
@@ -60,29 +52,29 @@ public class IndexParser
         // We start inside the index root :)
         if (Paranoid && IndexRoot.Underlying.IsNonResident)
             throw new InvalidDataException(
-                $"Expected $Index_Root to be resident, but came out as non-resident - this should never be the case!");
+                "Expected $Index_Root to be resident, but came out as non-resident - this should never be the case!");
 
-        if (!IndexRoot.Underlying.Accessor.TryGetMemory(out Span<byte> buffer))
+        if (!IndexRoot.Underlying.Accessor.TryGetMemory(out var buffer))
         {
             buffer = new byte[IndexRoot.Underlying.Accessor.Length];
             IndexRoot.Underlying.Accessor.ReadExactly(0, buffer);
         }
 
-        int offset = 16 + IndexRoot.OffsetToFirstEntry;
-        ReadOnlySpan<byte> bufferData = buffer[offset..buffer.Length];
+        var offset = 16 + IndexRoot.OffsetToFirstEntry;
+        ReadOnlySpan<byte> bufferData = buffer[offset..];
         return LookInIndexTree(bufferData, key);
     }
 
     public IEnumerable<IndexEntry> EnumerateEntries()
     {
-        if (!IndexRoot.Underlying.Accessor.TryGetMemory(out Span<byte> buffer))
+        if (!IndexRoot.Underlying.Accessor.TryGetMemory(out var buffer))
         {
             buffer = new byte[IndexRoot.Underlying.Accessor.Length];
             IndexRoot.Underlying.Accessor.ReadExactly(0, buffer);
         }
 
-        int offset = 16 + IndexRoot.OffsetToFirstEntry;
-        foreach (var indexEntry in TraverseIndexBuffer(buffer[offset..buffer.Length].ToArray()))
+        var offset = 16 + IndexRoot.OffsetToFirstEntry;
+        foreach (var indexEntry in TraverseIndexBuffer(buffer[offset..].ToArray()))
             yield return indexEntry;
     }
 
@@ -93,15 +85,13 @@ public class IndexParser
         while (!bufferData.IsEmpty)
         {
             // Parse & look for it
-            ushort length = bufferData.Span.ReadUInt16(8);
-            var entry = new IndexEntry(bufferData[0..length], IndexRoot, CollationHandler);
+            var length = bufferData.Span.ReadUInt16(8);
+            var entry = new IndexEntry(bufferData[..length], IndexRoot, CollationHandler);
 
             // we arrived at the end of the index-root!
             if (entry.Flags.HasFlag(IndexEntry.IndexFlags.HasSubnode))
-            {
                 foreach (var indexEntry in TraverseIndexBuffer(GetIndexBuffer(entry.SubnodeVcn!.Value)))
                     yield return indexEntry;
-            }
 
             if (entry.Flags.HasFlag(IndexEntry.IndexFlags.IsLast))
                 yield break;
@@ -127,7 +117,9 @@ public class IndexParser
                 }
             }
             else
+            {
                 yield return entry;
+            }
 
             // Look for next item in root
             bufferData = bufferData.Slice(length);
@@ -139,8 +131,8 @@ public class IndexParser
         if (Bitmap == null || UnalignedIndexAllocationStream == null)
             return null;
 
-        long byteOffset = node * (IndexRoot.ChildVcnInSectorUnits ? IndexAllocationVcnUnit : BootSector.BytesPerCluster);
-        long bitmapBit = byteOffset / IndexRoot.BytesPerIndexBlock;
+        var byteOffset = node * (IndexRoot.ChildVcnInSectorUnits ? IndexAllocationVcnUnit : BootSector.BytesPerCluster);
+        var bitmapBit = byteOffset / IndexRoot.BytesPerIndexBlock;
 
         if (!Bitmap.IsSet(bitmapBit))
             if (Paranoid) throw new Exception("A free sub-node was specified within an index entry!");
@@ -152,12 +144,12 @@ public class IndexParser
         string magicNumber;
         if ((magicNumber = indexBuffer.ReadAsciiString(0, 4)) != IndexAllocationAttribute.ExpectedMagicNumber)
             throw new InvalidDataException($"Index-Buffer {node} has an invalid magic number ({magicNumber}, " +
-                $"expected \"{IndexAllocationAttribute.ExpectedMagicNumber}\")!");
+                                           $"expected \"{IndexAllocationAttribute.ExpectedMagicNumber}\")!");
 
         FixupHelper.FixupRecord(indexBuffer);
 
-        int first = 0x18 + (int)indexBuffer.ReadUInt32(0x18);
-        int end = 0x18 + (int)indexBuffer.ReadUInt32(0x1C);
+        var first = 0x18 + (int)indexBuffer.ReadUInt32(0x18);
+        var end = 0x18 + (int)indexBuffer.ReadUInt32(0x1C);
         if (first < 0x28 || end > indexBuffer.Length || first > end)
             throw new InvalidDataException($"Index buffer {node} has an invalid entry range");
 
@@ -179,26 +171,25 @@ public class IndexParser
         while (!bufferData.IsEmpty)
         {
             // Parse & look for it
-            ushort length = bufferData.ReadUInt16(8);
-            var entry = new IndexEntry(bufferData[0..length].ToArray(), IndexRoot, CollationHandler);
+            var length = bufferData.ReadUInt16(8);
+            var entry = new IndexEntry(bufferData[..length].ToArray(), IndexRoot, CollationHandler);
 
             // we arrived at the end of the index-root!
             if (entry.Flags.HasFlag(IndexEntry.IndexFlags.IsLast))
             {
                 if (entry.Flags.HasFlag(IndexEntry.IndexFlags.HasSubnode))
                     return TryFindAllocationEntry(entry.SubnodeVcn!.Value, key);
-                else
-                    break;
+                break;
             }
 
-            int result = CollationHandler.CompareToTarget(entry.RawData, key, IndexRoot.CollationRule);
+            var result = CollationHandler.CompareToTarget(entry.RawData, key, IndexRoot.CollationRule);
 
             // They match => return
             if (result == 0)
                 return entry;
 
             // Is it within a sub-node-vcn? 
-            else if (result < 0)
+            if (result < 0)
                 // Yes - but do we have a subnode-vcn?
                 return entry.SubnodeVcn != null ? TryFindAllocationEntry(entry.SubnodeVcn.Value, key) : null;
 

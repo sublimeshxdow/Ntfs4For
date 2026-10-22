@@ -13,22 +13,23 @@ public static class RtlCrc64Nvme
     private static ulong[] BuildTable()
     {
         var table = new ulong[256];
-        for (int i = 0; i < 256; i++)
+        for (var i = 0; i < 256; i++)
         {
-            ulong crc = (ulong)i;
-            for (int j = 0; j < 8; j++)
+            var crc = (ulong)i;
+            for (var j = 0; j < 8; j++)
                 crc = (crc & 1) != 0 ? (crc >> 1) ^ Poly : crc >> 1;
             table[i] = crc;
         }
+
         return table;
     }
 
     // Mirrors RtlCrc64(Buffer, Size, InitialCrc)
     public static ulong Compute(ReadOnlySpan<byte> data, ulong initialCrc = 0)
     {
-        ulong crc = Mask ^ initialCrc;      // rax_1 = rbp ^ arg3
-        foreach (byte b in data)
+        var crc = Mask ^ initialCrc; // rax_1 = rbp ^ arg3
+        foreach (var b in data)
             crc = Table[(byte)(crc ^ b)] ^ (crc >> 8);
-        return crc ^ Mask;                  // return rax_1 ^ rbp
+        return crc ^ Mask; // return rax_1 ^ rbp
     }
 }

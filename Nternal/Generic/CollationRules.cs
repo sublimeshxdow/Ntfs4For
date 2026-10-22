@@ -1,4 +1,4 @@
-namespace Nternal.Structs;
+namespace Nternal.Ntfs.Generic;
 
 public enum CollationRules : uint
 {

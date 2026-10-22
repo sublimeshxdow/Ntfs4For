@@ -1,5 +1,3 @@
-using Nternal.Structs;
-
 namespace Nternal.Ntfs;
 
 public enum KnownMftRecord : ulong

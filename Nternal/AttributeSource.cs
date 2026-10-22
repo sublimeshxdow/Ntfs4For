@@ -1,9 +1,5 @@
-﻿using Nternal.Structs;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Nternal.Ntfs.Generic;
 
-namespace Nternal.Ntfs
-{
-    public readonly record struct AttributeSource(FileReference Record, ushort Id);
-}
+namespace Nternal.Ntfs;
+
+public readonly record struct AttributeSource(FileReference Record, ushort Id);

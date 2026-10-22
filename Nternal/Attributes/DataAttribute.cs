@@ -1,14 +1,12 @@
-using Nternal.Attributes;
 using Nternal.Core;
-using Nternal.Core.Streams;
-using Nternal.Streams;
+using Nternal.Ntfs.Streams;
 
 namespace Nternal.Ntfs.Attributes;
 
 public class DataAttribute : IParsableAttribute
 {
     public static NtfsAttributeType AttributeType => NtfsAttributeType.Data;
-   
+
     public NtfsAttribute Underlying { get; init; } = null!;
 
     public void ParseFromAccessor(bool paranoid)
@@ -20,7 +18,7 @@ public class DataAttribute : IParsableAttribute
         if (Underlying.Flags.HasFlag(NtfsAttributeFlags.Compressed) &&
             Underlying.Flags.HasFlag(NtfsAttributeFlags.Encrypted))
             throw new NotImplementedException(
-                $"Cannot retrieve Stream of attribute $Data - combination of Compression & Encryption is not supported!");
+                "Cannot retrieve Stream of attribute $Data - combination of Compression & Encryption is not supported!");
 
         IDataStream baseStream;
         // Normal data
@@ -31,7 +29,7 @@ public class DataAttribute : IParsableAttribute
             baseStream = new CompressedDataStream((NonResidentDataStream)Underlying.Accessor);
         // Encrypted (maybe also sparse) stream
         else if (Underlying.Flags.HasFlag(NtfsAttributeFlags.Encrypted))
-            throw new NotImplementedException($"At the moment, encrypted files are not supported!");
+            throw new NotImplementedException("At the moment, encrypted files are not supported!");
         else
             throw new InvalidOperationException($"Invalid combination of Attribute Flags - {Underlying.Flags}!");
 

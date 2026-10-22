@@ -1,12 +1,11 @@
 namespace Nternal.Ntfs.NtfsExtensions.Journal;
 
 /// <summary>
-/// USN_RECORD.Reason -- describes what kind of change(s) triggered this
-/// record. Multiple bits are commonly set at once (e.g. a rename sets
-/// both RenameOldName/RenameNewName across a pair of records, alongside
-/// Close on the final one).
-///
-/// Declared type in the official structure: DWORD (unsigned 32-bit).
+///     USN_RECORD.Reason -- describes what kind of change(s) triggered this
+///     record. Multiple bits are commonly set at once (e.g. a rename sets
+///     both RenameOldName/RenameNewName across a pair of records, alongside
+///     Close on the final one).
+///     Declared type in the official structure: DWORD (unsigned 32-bit).
 /// </summary>
 [Flags]
 public enum UsnReason : uint
@@ -38,8 +37,8 @@ public enum UsnReason : uint
     FileDelete = 0x00000200,
 
     /// <summary>
-    /// Extended attributes changed. Not accessible to ordinary
-    /// Windows-based applications.
+    ///     Extended attributes changed. Not accessible to ordinary
+    ///     Windows-based applications.
     /// </summary>
     EaChange = 0x00000400,
 
@@ -80,11 +79,11 @@ public enum UsnReason : uint
     TransactedChange = 0x00400000,
 
     /// <summary>
-    /// The FILE_ATTRIBUTE_INTEGRITY_STREAM attribute's state changed for
-    /// the given stream. ReFS-specific: integrity streams maintain a
-    /// checksum of the stream's data for read/write validation. Present
-    /// in the enum for completeness since the bit is structurally valid
-    /// in any USN_RECORD, but only meaningfully set on ReFS volumes.
+    ///     The FILE_ATTRIBUTE_INTEGRITY_STREAM attribute's state changed for
+    ///     the given stream. ReFS-specific: integrity streams maintain a
+    ///     checksum of the stream's data for read/write validation. Present
+    ///     in the enum for completeness since the bit is structurally valid
+    ///     in any USN_RECORD, but only meaningfully set on ReFS volumes.
     /// </summary>
     IntegrityChange = 0x00800000,
 
@@ -94,5 +93,5 @@ public enum UsnReason : uint
     // "unknown," not evidence of corruption.
 
     /// <summary>The file or directory was closed. Commonly the final record in a burst of changes.</summary>
-    Close = 0x80000000,
+    Close = 0x80000000
 }

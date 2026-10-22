@@ -1,5 +1,5 @@
 using Nternal.Ntfs.Attributes;
-using Nternal.Structs;
+using Nternal.Ntfs.Generic;
 
 namespace Nternal.Ntfs;
 
@@ -10,6 +10,6 @@ public class FolderEntry : FileNameData
         Reference = reference;
         Parse(fileNameDataBuffer, true);
     }
-    
+
     public FileReference Reference { get; init; }
 }

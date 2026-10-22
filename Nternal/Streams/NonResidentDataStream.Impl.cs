@@ -1,7 +1,4 @@
-using System.Buffers;
-using System.Reflection.PortableExecutable;
-
-namespace Nternal.Streams;
+namespace Nternal.Ntfs.Streams;
 
 public partial class NonResidentDataStream
 {
@@ -12,18 +9,18 @@ public partial class NonResidentDataStream
 
         foreach (var extent in Extents)
         {
-            long extentEndExclusive = extent.HighestVcn + 1;
+            var extentEndExclusive = extent.HighestVcn + 1;
 
             if (extentEndExclusive > lowVcn && extent.LowestVcn < highVcn)
             {
-                long overlapStart = Math.Max(extent.LowestVcn, lowVcn);
-                long overlapEnd = Math.Min(extentEndExclusive, highVcn);
-                long overlapClusters = overlapEnd - overlapStart;
+                var overlapStart = Math.Max(extent.LowestVcn, lowVcn);
+                var overlapEnd = Math.Min(extentEndExclusive, highVcn);
+                var overlapClusters = overlapEnd - overlapStart;
 
-                long bufferByteOffset = (overlapStart - lowVcn) * _bytesPerCluster;
-                int byteLength = (int)(overlapClusters * _bytesPerCluster);
+                var bufferByteOffset = (overlapStart - lowVcn) * Alignment;
+                var byteLength = (int)(overlapClusters * Alignment);
 
-                Span<byte> subBuffer = buffer.Slice((int)bufferByteOffset, byteLength);
+                var subBuffer = buffer.Slice((int)bufferByteOffset, byteLength);
                 ReadFromExtend(extent, subBuffer, overlapStart, (int)overlapClusters);
 
                 clustersCovered += overlapClusters;
@@ -54,20 +51,20 @@ public partial class NonResidentDataStream
 
         foreach (var run in extent.DataRuns)
         {
-            long runEndVcn = runStartVcn + run.Length; // extent-relative, exclusive
+            var runEndVcn = runStartVcn + run.Length; // extent-relative, exclusive
 
             // does this run overlap [relFirstVcn, relLastVcn) at all?
             if (runEndVcn > relFirstVcn && runStartVcn < relLastVcn)
             {
-                long overlapStart = Math.Max(runStartVcn, relFirstVcn);   // extent-relative
-                long overlapEnd = Math.Min(runEndVcn, relLastVcn);        // extent-relative
-                long overlapClusters = overlapEnd - overlapStart;
+                var overlapStart = Math.Max(runStartVcn, relFirstVcn); // extent-relative
+                var overlapEnd = Math.Min(runEndVcn, relLastVcn); // extent-relative
+                var overlapClusters = overlapEnd - overlapStart;
 
-                long runRelativeStart = overlapStart - runStartVcn;       // coordinate system #2
-                long bufferByteOffset = (overlapStart - relFirstVcn) * _bytesPerCluster; // coordinate system #3
-                int byteLength = (int)(overlapClusters * _bytesPerCluster);
+                var runRelativeStart = overlapStart - runStartVcn; // coordinate system #2
+                var bufferByteOffset = (overlapStart - relFirstVcn) * Alignment; // coordinate system #3
+                var byteLength = (int)(overlapClusters * Alignment);
 
-                Span<byte> subBuffer = bufferToFill.Slice((int)bufferByteOffset, byteLength);
+                var subBuffer = bufferToFill.Slice((int)bufferByteOffset, byteLength);
                 ReadFromRun(run, subBuffer, runRelativeStart); // buffer's own length now drives cluster count
 
                 clustersCovered += overlapClusters;
@@ -86,12 +83,12 @@ public partial class NonResidentDataStream
     {
         ArgumentOutOfRangeException.ThrowIfNegative(startingVcn);
 
-        if (bufferToFill.Length % _bytesPerCluster != 0)
+        if (bufferToFill.Length % Alignment != 0)
             throw new ArgumentException(
-                $"Buffer length ({bufferToFill.Length}) must be a whole number of clusters ({_bytesPerCluster} bytes each).",
+                $"Buffer length ({bufferToFill.Length}) must be a whole number of clusters ({Alignment} bytes each).",
                 nameof(bufferToFill));
 
-        long count = bufferToFill.Length / _bytesPerCluster;
+        long count = bufferToFill.Length / Alignment;
         if (startingVcn + count > run.Length)
             throw new ArgumentOutOfRangeException(nameof(startingVcn),
                 $"Attempted to read clusters {startingVcn}-{startingVcn + count} from run, which only contains {run.Length} clusters!");
@@ -105,6 +102,6 @@ public partial class NonResidentDataStream
         if (run.StartingCluster == null)
             throw new InvalidDataException("Non-sparse run has no StartingCluster set!");
 
-        _underlying.ReadExactly((run.StartingCluster.Value + startingVcn) * _bytesPerCluster, bufferToFill);
+        _underlying.ReadExactly((run.StartingCluster.Value + startingVcn) * Alignment, bufferToFill);
     }
 }

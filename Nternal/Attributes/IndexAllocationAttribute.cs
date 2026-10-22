@@ -1,17 +1,20 @@
-using Nternal.Attributes;
-using Nternal.Core.Streams;
+using Nternal.Core;
 
 namespace Nternal.Ntfs.Attributes;
 
 public class IndexAllocationAttribute : IParsableAttribute
 {
-    public static NtfsAttributeType AttributeType => NtfsAttributeType.IndexAllocation;
-    
     public const string ExpectedMagicNumber = "INDX";
-    
-    public NtfsAttribute Underlying { get; init; } = null!;
-    public void ParseFromAccessor(bool paranoid)
-    { }
+    public static NtfsAttributeType AttributeType => NtfsAttributeType.IndexAllocation;
 
-    public IDataStream GetStream() => Underlying.Accessor;
+    public NtfsAttribute Underlying { get; init; } = null!;
+
+    public void ParseFromAccessor(bool paranoid)
+    {
+    }
+
+    public IDataStream GetStream()
+    {
+        return Underlying.Accessor;
+    }
 }

@@ -1,17 +1,9 @@
-using Nternal.Extensions;
-using System;
+using Nternal.Core.Extensions;
 
 namespace Nternal.Ntfs.Security;
 
 public sealed class SecurityDescriptor
 {
-    public byte Revision { get; }
-    public SecurityDescriptorControl Control { get; }
-    public Sid? Owner { get; }
-    public Sid? Group { get; }
-    public Acl? Sacl { get; }
-    public Acl? Dacl { get; }
-
     public SecurityDescriptor(ReadOnlySpan<byte> data, bool paranoid = true)
     {
         if (data.Length < 0x14)
@@ -27,10 +19,10 @@ public sealed class SecurityDescriptor
             throw new InvalidDataException(
                 "SECURITY_DESCRIPTOR is not self-relative -- cannot be parsed from a flat byte buffer.");
 
-        uint ownerOffset = data.ReadUInt32(4);
-        uint groupOffset = data.ReadUInt32(8);
-        uint saclOffset = data.ReadUInt32(12);
-        uint daclOffset = data.ReadUInt32(16);
+        var ownerOffset = data.ReadUInt32(4);
+        var groupOffset = data.ReadUInt32(8);
+        var saclOffset = data.ReadUInt32(12);
+        var daclOffset = data.ReadUInt32(16);
 
         // Owner/Group are normally always present on a valid SD; the
         // null-check here is purely defensive against malformed data.
@@ -40,7 +32,18 @@ public sealed class SecurityDescriptor
         // Per MS-DTYP: if the *Present control bit is unset, the offset
         // field MUST be zero and the corresponding ACL MUST NOT be parsed
         // -- check both, not just whichever one happens to look truthy.
-        Sacl = Control.HasFlag(SecurityDescriptorControl.SaclPresent) && saclOffset != 0 ? new Acl(data[(int)saclOffset..], paranoid) : null;
-        Dacl = Control.HasFlag(SecurityDescriptorControl.DaclPresent) && daclOffset != 0 ? new Acl(data[(int)daclOffset..], paranoid) : null;
+        Sacl = Control.HasFlag(SecurityDescriptorControl.SaclPresent) && saclOffset != 0
+            ? new Acl(data[(int)saclOffset..], paranoid)
+            : null;
+        Dacl = Control.HasFlag(SecurityDescriptorControl.DaclPresent) && daclOffset != 0
+            ? new Acl(data[(int)daclOffset..], paranoid)
+            : null;
     }
+
+    public byte Revision { get; }
+    public SecurityDescriptorControl Control { get; }
+    public Sid? Owner { get; }
+    public Sid? Group { get; }
+    public Acl? Sacl { get; }
+    public Acl? Dacl { get; }
 }

@@ -1,6 +1,4 @@
-using System.Buffers.Binary;
-using Nternal.Attributes;
-using Nternal.Extensions;
+using Nternal.Core.Extensions;
 
 namespace Nternal.Ntfs.Attributes;
 
@@ -29,17 +27,18 @@ public enum VolumeFlags : ushort
 
 public class VolumeInformationAttribute : IParsableAttribute
 {
-    public static NtfsAttributeType AttributeType => NtfsAttributeType.VolumeInfo;
-
-    public NtfsAttribute Underlying { get; init; } = null!;
-
     public byte MajorVersion { get; private set; }
     public byte MinorVersion { get; private set; }
     public VolumeFlags Flags { get; private set; }
 
+    public string NtfsVersion => $"{MajorVersion}.{MinorVersion}";
+    public static NtfsAttributeType AttributeType => NtfsAttributeType.VolumeInfo;
+
+    public NtfsAttribute Underlying { get; init; } = null!;
+
     public void ParseFromAccessor(bool paranoid)
     {
-        long length = Underlying.Accessor.AllocatedLength;
+        var length = Underlying.Accessor.AllocatedLength;
         if (paranoid && length != 12)
         {
             if (paranoid)
@@ -55,6 +54,4 @@ public class VolumeInformationAttribute : IParsableAttribute
         MinorVersion = data[9];
         Flags = (VolumeFlags)data.ReadUInt16(10);
     }
-
-    public string NtfsVersion => $"{MajorVersion}.{MinorVersion}";
 }

@@ -1,15 +1,13 @@
-using Nternal.Attributes;
 using Nternal.Ntfs.Security;
 
 namespace Nternal.Ntfs.Attributes;
 
 public class SecurityDescriptorAttribute : IParsableAttribute
 {
+    public SecurityDescriptor Descriptor { get; private set; }
     public static NtfsAttributeType AttributeType => NtfsAttributeType.SecurityDescriptor;
 
     public NtfsAttribute Underlying { get; init; } = null!;
-
-    public SecurityDescriptor Descriptor { get; private set; }
 
     public void ParseFromAccessor(bool paranoid)
     {

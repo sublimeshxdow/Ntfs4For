@@ -1,386 +1,416 @@
-﻿using System;
-using System.Buffers.Binary;
-using System.Collections.Generic;
+﻿using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text;
-using Nternal.Attributes;
-using Nternal.Core.Streams;
-using Nternal.Extensions;
-using Nternal.Helpers;
-using Nternal.Ntfs;
+using Nternal.Core;
+using Nternal.Core.Extensions;
 using Nternal.Ntfs.Attributes;
+using Nternal.Ntfs.Generic;
 using Nternal.Ntfs.Hashing;
+using Nternal.Ntfs.Helpers;
 using Nternal.Ntfs.Index;
 using Nternal.Ntfs.Security;
-using Nternal.Structs;
 
-namespace Nternal
+namespace Nternal.Ntfs;
+
+public partial class NtfsVolume
 {
-    public partial class NtfsVolume
+    /// <summary>
+    ///     Returns the raw record referenced by the specified file reference.
+    /// </summary>
+    /// <param name="reference">The reference to the file record.</param>
+    /// <param name="isAttributeLookup">
+    ///     Whether this function is called for the purpose of looking up foreign attributes
+    ///     referenced via $Attribute_List.
+    /// </param>
+    /// <param name="compareSequence">Whether to verify the file record's sequence number.</param>
+    /// <param name="mft">
+    ///     [Bootstrapping] Represents the $Mft-stream to read the record from. Required in early stages of
+    ///     mounting the volume.
+    /// </param>
+    /// <returns>The raw file record.</returns>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown if a fatal, internal error occured during parsing the referenced
+    ///     file record.
+    /// </exception>
+    /// <exception cref="Exception">Thrown if a fatal, internal error occured during parsing the referenced file record.</exception>
+    /// <exception cref="InvalidDataException">Thrown if the referenced file record could not be parsed.</exception>
+    /// <exception cref="ArgumentException">
+    ///     Thrown when mismatch between the reference & record's sequence numbers has been
+    ///     detected.
+    /// </exception>
+    internal RawFileRecord GetRawRecordData(FileReference reference, bool isAttributeLookup = false,
+        bool compareSequence = true, IDataStream? mft = null)
     {
-        /// <summary>
-        /// Returns the raw record referenced by the specified file reference.
-        /// </summary>
-        /// <param name="reference">The reference to the file record.</param>
-        /// <param name="isAttributeLookup">Whether this function is called for the purpose of looking up foreign attributes referenced via $Attribute_List.</param>
-        /// <param name="compareSequence">Whether to verify the file record's sequence number.</param>
-        /// <param name="mft">[Bootstrapping] Represents the $Mft-stream to read the record from. Required in early stages of mounting the volume.</param>
-        /// <returns>The raw file record.</returns>
-        /// <exception cref="InvalidOperationException">Thrown if a fatal, internal error occured during parsing the referenced file record.</exception>
-        /// <exception cref="Exception">Thrown if a fatal, internal error occured during parsing the referenced file record.</exception>
-        /// <exception cref="InvalidDataException">Thrown if the referenced file record could not be parsed.</exception>
-        /// <exception cref="ArgumentException">Thrown when mismatch between the reference & record's sequence numbers has been detected.</exception>
-        internal RawFileRecord GetRawRecordData(FileReference reference, bool isAttributeLookup = false,
-            bool compareSequence = true, IDataStream? mft = null)
+        if (_hasParsedMftYet)
         {
-            if (_hasParsedMftYet)
+            if (MftBitmap == null)
             {
+                MftBitmap = MftFile!.GetAttributeData<BitmapAttribute>();
                 if (MftBitmap == null)
-                {
-                    MftBitmap = MftFile!.GetAttributeData<BitmapAttribute>("");
-                    if (MftBitmap == null)
-                        throw new InvalidOperationException(
-                            $"$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
-                }
-
-                if (!MftBitmap.IsInRange((long)reference.FileRecordId))
-                    throw new Exception($"Attempted to parse an $Mft-Record! outside the valid range!");
-
-                if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.DenyUnusedMftRecords) && !MftBitmap.IsSet((long)reference.FileRecordId))
-                    throw new Exception($"Attempted to parse an unused $Mft-Record!");
+                    throw new InvalidOperationException(
+                        "$Mft does not seem to have an unnamed bitmap-attribute - corruption detected.");
             }
 
-            var mftStream = mft ?? MftFile!.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "")?.GetStream();
-            if (mftStream == null)
-                throw new InvalidOperationException(
-                    $"$Mft does not seem to have an unnamed data-attribute - corruption detected.");
+            if (!MftBitmap.IsInRange((long)reference.FileRecordId))
+                throw new Exception("Attempted to parse an $Mft-Record! outside the valid range!");
 
-            var fileRecordSize = BootSector.FileRecordSize;
-            Span<byte> fileRecord = fileRecordSize <= 4096 ? stackalloc byte[fileRecordSize] : new byte[fileRecordSize];
-            mftStream.ReadExactly((long)reference.FileRecordId * fileRecordSize, fileRecord);
-
-            FixupHelper.FixupRecord(fileRecord);
-
-            var rawRecord = new RawFileRecord(fileRecord);
-            if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.DenyUnusedMftRecords) && !rawRecord.Flags.HasFlag(FileRecordFlags.IsInUse))
-                throw new Exception($"Attempted to parse an unused $Mft-Record!");
-
-            if (rawRecord.MagicNumber != GenericFileRecord.ExpectedMagicNumber)
-                throw new InvalidDataException($"RecordHeader referenced by {reference} has an invalid magic number ({rawRecord.MagicNumber}, " +
-                    $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
-
-            if (compareSequence && rawRecord.SequenceNumber != reference.SequenceNumber)
-            {
-                string msg = $"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!";
-                if (isAttributeLookup)
-                    msg += "\nThis happened during an attribute lookup. Ensure the volume is not corrupted, and that the volume was opened locking!";
-
-                throw new ArgumentException(msg);
-            }
-
-            return rawRecord;
-        }
-        
-        private void ParseMft(bool fixup = true, bool postXp = true)
-        {
-            var raw = GetMftRecord(fixup);
-            MftFile = new NtfsFile(raw, _provider, this, (ulong)KnownMftRecord.Mft, postXp);
-            _hasParsedMftYet = true;
-        }
-        
-        /// <summary>
-        /// Converts a known $Mft record index to a file reference.
-        /// </summary>
-        /// <param name="record">An enum value representing the $Mft record to be queried.</param>
-        /// <returns>Returns the respective file reference.</returns>
-        public FileReference GetKnownMftReference(KnownMftRecord record)
-            => new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
-        
-        /// <summary>
-        /// Returns a known [& fixed] Ntfs file.
-        /// </summary>
-        /// <param name="record">An enum value representing the $Mft record to be queried.</param>
-        /// <returns>The queried Ntfs file entry.</returns>
-        public NtfsFile GetKnownNtfsFile(KnownMftRecord record)
-        {
-            EnsureIsMounted();
-            return GetKnownNtfsFileUnsafe(record);
+            if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.DenyUnusedMftRecords) &&
+                !MftBitmap.IsSet((long)reference.FileRecordId))
+                throw new Exception("Attempted to parse an unused $Mft-Record!");
         }
 
-        private NtfsFile GetKnownNtfsFileUnsafe(KnownMftRecord record)
-            => GetNtfsFileUnsafe(GetKnownMftReference(record), true);
-        
-        /// <summary>
-        /// Returns the Ntfs file object referenced by the specified reference.
-        /// </summary>
-        /// <param name="reference">The file reference.</param>
-        /// <param name="compareSequence">Whether the sequence number should be verified.</param>
-        /// <returns>The respective Ntfs file.</returns>
-        public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
+        var mftStream = mft ?? MftFile!.GetAttributeData<DataAttribute>(NtfsAttributeType.Data, "")?.GetStream();
+        if (mftStream == null)
+            throw new InvalidOperationException(
+                "$Mft does not seem to have an unnamed data-attribute - corruption detected.");
+
+        var fileRecordSize = BootSector.FileRecordSize;
+        var fileRecord = fileRecordSize <= 4096 ? stackalloc byte[fileRecordSize] : new byte[fileRecordSize];
+        mftStream.ReadExactly((long)reference.FileRecordId * fileRecordSize, fileRecord);
+
+        FixupHelper.FixupRecord(fileRecord);
+
+        var rawRecord = new RawFileRecord(fileRecord);
+        if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.DenyUnusedMftRecords) &&
+            !rawRecord.Flags.HasFlag(FileRecordFlags.IsInUse))
+            throw new Exception("Attempted to parse an unused $Mft-Record!");
+
+        if (rawRecord.MagicNumber != GenericFileRecord.ExpectedMagicNumber)
+            throw new InvalidDataException(
+                $"RecordHeader referenced by {reference} has an invalid magic number ({rawRecord.MagicNumber}, " +
+                $"expected \"{GenericFileRecord.ExpectedMagicNumber}\")!");
+
+        if (compareSequence && rawRecord.SequenceNumber != reference.SequenceNumber)
         {
-            EnsureIsMounted();
-            return GetNtfsFileUnsafe(reference, compareSequence);
+            var msg =
+                $"Attempted to parse record for file-reference {reference}, but that doesn't match with the record's sequence-number {rawRecord.SequenceNumber}!";
+            if (isAttributeLookup)
+                msg +=
+                    "\nThis happened during an attribute lookup. Ensure the volume is not corrupted, and that the volume was opened locking!";
+
+            throw new ArgumentException(msg);
         }
-        
-        private NtfsFile GetNtfsFileUnsafe(FileReference reference, bool compareSequence = true)
+
+        return rawRecord;
+    }
+
+    private void ParseMft(bool fixup = true, bool postXp = true)
+    {
+        var raw = GetMftRecord(fixup);
+        MftFile = new NtfsFile(raw, _provider, this, (ulong)KnownMftRecord.Mft, postXp);
+        _hasParsedMftYet = true;
+    }
+
+    /// <summary>
+    ///     Converts a known $Mft record index to a file reference.
+    /// </summary>
+    /// <param name="record">An enum value representing the $Mft record to be queried.</param>
+    /// <returns>Returns the respective file reference.</returns>
+    public FileReference GetKnownMftReference(KnownMftRecord record)
+    {
+        return new FileReference((ulong)record, (ushort)Math.Max((ulong)record, 1));
+    }
+
+    /// <summary>
+    ///     Returns a known [& fixed] Ntfs file.
+    /// </summary>
+    /// <param name="record">An enum value representing the $Mft record to be queried.</param>
+    /// <returns>The queried Ntfs file entry.</returns>
+    public NtfsFile GetKnownNtfsFile(KnownMftRecord record)
+    {
+        EnsureIsMounted();
+        return GetKnownNtfsFileUnsafe(record);
+    }
+
+    private NtfsFile GetKnownNtfsFileUnsafe(KnownMftRecord record)
+    {
+        return GetNtfsFileUnsafe(GetKnownMftReference(record));
+    }
+
+    /// <summary>
+    ///     Returns the Ntfs file object referenced by the specified reference.
+    /// </summary>
+    /// <param name="reference">The file reference.</param>
+    /// <param name="compareSequence">Whether the sequence number should be verified.</param>
+    /// <returns>The respective Ntfs file.</returns>
+    public NtfsFile GetNtfsFile(FileReference reference, bool compareSequence = true)
+    {
+        EnsureIsMounted();
+        return GetNtfsFileUnsafe(reference, compareSequence);
+    }
+
+    private NtfsFile GetNtfsFileUnsafe(FileReference reference, bool compareSequence = true)
+    {
+        var rawRecord = GetRawRecordData(reference, false, compareSequence);
+        return new NtfsFile(rawRecord, _provider, this, reference.FileRecordId);
+    }
+
+    /// <summary>
+    ///     Yields the amount of $Mft records on this volume.
+    /// </summary>
+    /// <returns></returns>
+    public long GetMftRecordCount()
+    {
+        EnsureIsMounted();
+        return MftFile!.GetDataStream().Length / BootSector.FileRecordSize;
+    }
+
+    /// <summary>
+    ///     Returns the primary path of the specified file reference.
+    /// </summary>
+    /// <param name="reference">The reference to the file to retrieve the primary path of.</param>
+    /// <returns>Returns the queried path.</returns>
+    /// <exception cref="IOException">Throws if the specified path cannot be resolved properly.</exception>
+    public string GetPrimaryAbsolutePath(FileReference reference)
+    {
+        EnsureIsMounted();
+        var root = GetKnownMftReference(KnownMftRecord.Root);
+        var currentReference = reference;
+        StringBuilder sb = new(256);
+
+        while (currentReference != root)
         {
-            var rawRecord = GetRawRecordData(reference, isAttributeLookup: false, compareSequence: compareSequence);
-            return new NtfsFile(rawRecord, _provider, this, reference.FileRecordId, true);
-        }
-        
-        /// <summary>
-        /// Yields the amount of $Mft records on this volume. 
-        /// </summary>
-        /// <returns></returns>
-        public long GetMftRecordCount()
-        {
-            EnsureIsMounted();
-            return MftFile!.GetDataStream().Length / BootSector.FileRecordSize;
-        }
-        
-        /// <summary>
-        /// Returns the primary path of the specified file reference.
-        /// </summary>
-        /// <param name="reference">The reference to the file to retrieve the primary path of.</param>
-        /// <returns>Returns the queried path.</returns>
-        /// <exception cref="IOException">Throws if the specified path cannot be resolved properly.</exception>
-        public string GetPrimaryAbsolutePath(FileReference reference)
-        {
-            EnsureIsMounted();
-            FileReference root = GetKnownMftReference(KnownMftRecord.Root);
-            FileReference currentReference = reference;
-            StringBuilder sb = new(256);
-
-            while (currentReference != root)
-            {
-                NtfsFile? file;
-
-                try
-                {
-                    file = GetNtfsFile(currentReference);
-                }
-
-                catch (FileNotFoundException)
-                {
-                    sb.Insert(0, "??");
-                    break;
-                }
-
-                var fileNameAttr = file.GetBestFittingName();
-                if (fileNameAttr == null)
-                    throw new IOException($"Faield to retrieve absolute path of file {reference}.\n[File {file.GetReference()} has no suitable $File_Info attribute!]");
-
-                currentReference = fileNameAttr.ParentFolder;
-                sb.Insert(0, $"/{fileNameAttr.Name}");
-            }
-
-            return sb.Length > 0 ? sb.ToString() : "/";
-        }
-        
-        /// <summary>
-        /// Retrieves a file object representing a $Mft-Entry on this volume.
-        /// It contains base information regarding the $Mft-Record as well as the Ntfs attributes belonging to that record.
-        /// </summary>
-        /// <param name="path">The logical path of the entry to retrieve.</param>
-        /// <returns>The respective file object.</returns>
-        /// <exception cref="InvalidOperationException">Throws if the root folder's entry hasn't been initialized yet, the path is in an invalid format, or there is a file / folder mismatch.</exception>
-        /// <exception cref="ArgumentException">Throws if the specified path is invalid.</exception>
-        /// <exception cref="FileNotFoundException">Throws if the specified path could not be found.</exception>
-        /// <exception cref="NotSupportedException">Throws if the path involves symbolic links that cannot be processed.</exception>
-        public NtfsFile GetNtfsFile(string path)
-        {
-            EnsureIsMounted();
-            if (RootFolder == null)
-                throw new InvalidOperationException(
-                    "Cannot parse arbitrary NTFS files before initialization completed!");
-
-            var components = new LinkedList<string>(path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries));
-            var references = new Stack<FileReference>();
-            references.Push(RootFolder.GetReference());
-            NtfsFile file = RootFolder;
-
-            int symlinkHops = 0;
-
-            while (components.Count > 0)
-            {
-                string entry = components.First!.Value;
-                components.RemoveFirst();
-
-                if (entry is "" or ".")
-                    continue;
-
-                if (entry == "..")
-                {
-                    if (references.Count <= 1)
-                        throw new ArgumentException("Cannot do \"..\" when already at the root!");
-
-                    references.Pop();
-                    file = GetNtfsFile(references.Peek(), true);
-                    continue;
-                }
-
-                if (!file.RecordHeader.Flags.HasFlag(FileRecordFlags.IsDirectory))
-                    throw new InvalidOperationException($"\"{entry}\" cannot be looked up inside a non-directory!");
-
-                IndexParser parser = CreateIndexParser(file, "$I30");
-                var indexEntry = parser.TryFindRootEntry(Encoding.Unicode.GetBytes(entry));
-                if (indexEntry == null)
-                    throw new FileNotFoundException($"Failed to find file/folder \"{entry}\"!");
-
-                var reference = indexEntry.GetI30MftReference()!.Value;
-                var resolved = GetNtfsFile(reference, true);
-
-                // Check the entry we just found, not the 'file' from before descending.
-                var reparse = resolved.NtfsAttributes.FirstOrDefault(x => x.Type == NtfsAttributeType.Reparse);
-                if (reparse != null)
-                {
-                    var reparseData = reparse.Cast<ReparseAttribute>(true);
-                    if (reparseData.Tag.HasFlag(ReparseTag.SymbolicLink))
-                    {
-                        if (++symlinkHops > NtfsPolicyConfig.HopLimit)
-                            throw new InvalidOperationException("Too many symbolic link redirections -- possible loop.");
-
-                        var symlinkData = reparseData.Data as SymbolicLinkReparseData
-                                          ?? throw new InvalidOperationException($"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
-
-                        if (!symlinkData.Flags.HasFlag(SymbolicLinkReparseData.SymlinkFlags.IsRelative))
-                            throw new NotSupportedException($"Only relative symbolic links are currently supported (\"{entry}\" is absolute).");
-
-                        var targetParts = symlinkData.SubstituteName.Split('\\', StringSplitOptions.RemoveEmptyEntries);
-                        for (int i = targetParts.Length - 1; i >= 0; i--)
-                            components.AddFirst(targetParts[i]);
-
-                        continue;
-                    }
-                }
-
-                if (references.Contains(reference))
-                    throw new InvalidOperationException($"Detected circular folder structure involving \"{entry}\"!");
-
-                references.Push(reference);
-                file = resolved;
-            }
-
-            return file;
-        }
-        
-        /// <summary>
-        /// Enumerates all indexed reparse-points on this volume.
-        /// </summary>
-        /// <returns>An enumerator object for enumerating all reparse points with the respective file references.</returns>
-        /// <exception cref="NotSupportedException">Thrown if the file indexing all reparse points [$Extend/$Reparse] is not present.</exception>
-        public IEnumerable<(ReparseTag Tag, FileReference Reference)> EnumerateIndexedSymLinks()
-        {
-            NtfsFile file;
-            IndexParser index;
+            NtfsFile? file;
 
             try
             {
-                file = GetNtfsFile("/$Extend/$Reparse");
-                index = CreateIndexParser(file, "$R");
+                file = GetNtfsFile(currentReference);
             }
 
             catch (FileNotFoundException)
             {
-                throw new NotSupportedException($"Cannot enumerate symbolic links, as $Extend/$Reparse is not present!");
+                sb.Insert(0, "??");
+                break;
             }
 
-            foreach (var entry in index.EnumerateEntries())
+            var fileNameAttr = file.GetBestFittingName();
+            if (fileNameAttr == null)
+                throw new IOException(
+                    $"Faield to retrieve absolute path of file {reference}.\n[File {file.GetReference()} has no suitable $File_Info attribute!]");
+
+            currentReference = fileNameAttr.ParentFolder;
+            sb.Insert(0, $"/{fileNameAttr.Name}");
+        }
+
+        return sb.Length > 0 ? sb.ToString() : "/";
+    }
+
+    /// <summary>
+    ///     Retrieves a file object representing a $Mft-Entry on this volume.
+    ///     It contains base information regarding the $Mft-Record as well as the Ntfs attributes belonging to that record.
+    /// </summary>
+    /// <param name="path">The logical path of the entry to retrieve.</param>
+    /// <returns>The respective file object.</returns>
+    /// <exception cref="InvalidOperationException">
+    ///     Throws if the root folder's entry hasn't been initialized yet, the path is
+    ///     in an invalid format, or there is a file / folder mismatch.
+    /// </exception>
+    /// <exception cref="ArgumentException">Throws if the specified path is invalid.</exception>
+    /// <exception cref="FileNotFoundException">Throws if the specified path could not be found.</exception>
+    /// <exception cref="NotSupportedException">Throws if the path involves symbolic links that cannot be processed.</exception>
+    public NtfsFile GetNtfsFile(string path)
+    {
+        EnsureIsMounted();
+        if (RootFolder == null)
+            throw new InvalidOperationException(
+                "Cannot parse arbitrary NTFS files before initialization completed!");
+
+        var components = new LinkedList<string>(path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries));
+        var references = new Stack<FileReference>();
+        references.Push(RootFolder.GetReference());
+        var file = RootFolder;
+
+        var symlinkHops = 0;
+
+        while (components.Count > 0)
+        {
+            var entry = components.First!.Value;
+            components.RemoveFirst();
+
+            if (entry is "" or ".")
+                continue;
+
+            if (entry == "..")
             {
-                ReparseTag tag = (ReparseTag)entry.GetKey().ReadUInt32(0);
-                FileReference reference = new(entry.GetKey().ReadUInt64(4));
-                yield return (tag, reference);
+                if (references.Count <= 1)
+                    throw new ArgumentException("Cannot do \"..\" when already at the root!");
+
+                references.Pop();
+                file = GetNtfsFile(references.Peek());
+                continue;
             }
+
+            if (!file.RecordHeader.Flags.HasFlag(FileRecordFlags.IsDirectory))
+                throw new InvalidOperationException($"\"{entry}\" cannot be looked up inside a non-directory!");
+
+            var parser = CreateIndexParser(file, "$I30");
+            var indexEntry = parser.TryFindRootEntry(Encoding.Unicode.GetBytes(entry));
+            if (indexEntry == null)
+                throw new FileNotFoundException($"Failed to find file/folder \"{entry}\"!");
+
+            var reference = indexEntry.GetI30MftReference()!.Value;
+            var resolved = GetNtfsFile(reference);
+
+            // Check the entry we just found, not the 'file' from before descending.
+            var reparse = resolved.NtfsAttributes.FirstOrDefault(x => x.Type == NtfsAttributeType.Reparse);
+            if (reparse != null)
+            {
+                var reparseData = reparse.Cast<ReparseAttribute>();
+                if (reparseData.Tag.HasFlag(ReparseTag.SymbolicLink))
+                {
+                    if (++symlinkHops > NtfsPolicyConfig.HopLimit)
+                        throw new InvalidOperationException("Too many symbolic link redirections -- possible loop.");
+
+                    var symlinkData = reparseData.Data as SymbolicLinkReparseData
+                                      ?? throw new InvalidOperationException(
+                                          $"\"{entry}\" has Reparse type SymbolicLink but Data is of another type!");
+
+                    if (!symlinkData.Flags.HasFlag(SymbolicLinkReparseData.SymlinkFlags.IsRelative))
+                        throw new NotSupportedException(
+                            $"Only relative symbolic links are currently supported (\"{entry}\" is absolute).");
+
+                    var targetParts = symlinkData.SubstituteName.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+                    for (var i = targetParts.Length - 1; i >= 0; i--)
+                        components.AddFirst(targetParts[i]);
+
+                    continue;
+                }
+            }
+
+            if (references.Contains(reference))
+                throw new InvalidOperationException($"Detected circular folder structure involving \"{entry}\"!");
+
+            references.Push(reference);
+            file = resolved;
         }
 
-        /// <summary>
-        /// Queries the security descriptor for a given file.
-        /// </summary>
-        /// <param name="file">The file to retrieve the security descriptor for.</param>
-        /// <returns>The corresponding security descriptor.</returns>
-        /// <exception cref="InvalidDataException">[Iff NtfsPolicyConfig:ValidateSdh] Thrown if a mismatch is encountered during internal parsing.</exception>
-        public SecurityDescriptor? GetSecurityDescriptor(NtfsFile file)
+        return file;
+    }
+
+    /// <summary>
+    ///     Enumerates all indexed reparse-points on this volume.
+    /// </summary>
+    /// <returns>An enumerator object for enumerating all reparse points with the respective file references.</returns>
+    /// <exception cref="NotSupportedException">
+    ///     Thrown if the file indexing all reparse points [$Extend/$Reparse] is not
+    ///     present.
+    /// </exception>
+    public IEnumerable<(ReparseTag Tag, FileReference Reference)> EnumerateIndexedSymLinks()
+    {
+        NtfsFile file;
+        IndexParser index;
+
+        try
         {
-            EnsureIsMounted();
-            var descriptor = file.GetAttributeData<SecurityDescriptorAttribute>("");
-            if (descriptor != null)
-                return descriptor.Descriptor;
-
-            var index = file.GetAttributeData<StandardInformationAttribute>()?.SecurityId;
-            return index != null ? LookupSecurityDescriptorByIndex(index.Value) : null;
+            file = GetNtfsFile("/$Extend/$Reparse");
+            index = CreateIndexParser(file, "$R");
         }
-        
-        /// <summary>
-        /// Retrieves a security descriptor for a given security id.
-        /// </summary>
-        /// <param name="securityId">The givens security id.</param>
-        /// <returns>The security descriptor referenced by the given security id.</returns>
-        /// <exception cref="InvalidDataException">[Iff NtfsPolicyConfig:ValidateSdh] Thrown if a mismatch is encountered during internal parsing.</exception>
-        private SecurityDescriptor? LookupSecurityDescriptorByIndex(uint securityId)
+
+        catch (FileNotFoundException)
         {
-            EnsureIsMounted();
-            Span<byte> lookupKey = stackalloc byte[sizeof(uint)];
-            BinaryPrimitives.WriteUInt32LittleEndian(lookupKey, securityId);
-
-            var index = CreateIndexParser(SecureFile, "$SII");
-            var entry = index.TryFindRootEntry(lookupKey);
-            if (entry == null)
-                return null;
-
-            long offset = entry.GetData().ReadInt64(0x08);
-            int size = entry.GetData().ReadInt32(0x10);
-            const int headerOffset = 20;
-
-            var sdsStream = SecureFile.GetDataStream("$SDS");
-            Span<byte> sdsEntry = size <= 256 ? stackalloc byte[size] : new byte[size];
-            sdsStream.ReadExactly(offset, sdsEntry);
-
-            // Let's see if the hash matches
-            Trace.Assert(sdsEntry.ReadUInt32(0x00) == SecurityHashing.HashSecurityDescriptor(sdsEntry[headerOffset..]));
-
-            uint writtenSecurityId = sdsEntry.ReadUInt32(0x04);
-            long writtenOffset = sdsEntry.ReadInt64(0x08);
-            int writtenSize = sdsEntry.ReadInt32(0x10);
-
-            if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ValidateSdh)
-                && (securityId != writtenSecurityId || offset != writtenOffset || size != writtenSize))
-                throw new InvalidDataException(
-                    $"Invalid $Secure:$SDS stream - offset/length mismatch of entry with securityId {securityId}" +
-                    $"(IndexKeyOffset={offset}, IndexKeySize={size}, SdsEntryOffset={writtenOffset}, SdsEntrySize={writtenSize})!");
-
-            return new SecurityDescriptor(sdsEntry[headerOffset..]);
+            throw new NotSupportedException("Cannot enumerate symbolic links, as $Extend/$Reparse is not present!");
         }
-        
-        /// <summary>
-        /// Returns a raw file record representing the file record header & raw attribute data.
-        /// </summary>
-        /// <param name="fixup">Whether to fixup the raw volume data.</param>
-        /// <returns>The raw file record.</returns>
-        private RawFileRecord GetMftRecord(bool fixup = true)
+
+        foreach (var entry in index.EnumerateEntries())
         {
-            Span<byte> mftRecord = BootSector.FileRecordSize <= 1024
-                ? stackalloc byte[BootSector.FileRecordSize]
-                : new byte[BootSector.FileRecordSize];
-
-            _provider.ReadExactly(BootSector.MftClusterNumber * BootSector.BytesPerCluster, mftRecord);
-
-            if (fixup)
-                FixupHelper.FixupRecord(mftRecord);
-
-            return new RawFileRecord(mftRecord);
+            var tag = (ReparseTag)entry.GetKey().ReadUInt32();
+            FileReference reference = new(entry.GetKey().ReadUInt64(4));
+            yield return (tag, reference);
         }
-        
-        /// <summary>
-        /// Retrieves a specific index parser for a given file/folder of this volume.
-        /// </summary>
-        /// <param name="file">The file to retrieve the index for.</param>
-        /// <param name="index">The type of index to retrieve, e.g. $I30.</param>
-        /// <returns>Returns an index parser for the given file and index.</returns>
-        public IndexParser CreateIndexParser(NtfsFile file, string index)
-        {
-            EnsureIsMounted();
-            return new IndexParser(file, index, CollationHandler, BootSector);
-        }
+    }
+
+    /// <summary>
+    ///     Queries the security descriptor for a given file.
+    /// </summary>
+    /// <param name="file">The file to retrieve the security descriptor for.</param>
+    /// <returns>The corresponding security descriptor.</returns>
+    /// <exception cref="InvalidDataException">
+    ///     [Iff NtfsPolicyConfig:ValidateSdh] Thrown if a mismatch is encountered during
+    ///     internal parsing.
+    /// </exception>
+    public SecurityDescriptor? GetSecurityDescriptor(NtfsFile file)
+    {
+        EnsureIsMounted();
+        var descriptor = file.GetAttributeData<SecurityDescriptorAttribute>();
+        if (descriptor != null)
+            return descriptor.Descriptor;
+
+        var index = file.GetAttributeData<StandardInformationAttribute>()?.SecurityId;
+        return index != null ? LookupSecurityDescriptorByIndex(index.Value) : null;
+    }
+
+    /// <summary>
+    ///     Retrieves a security descriptor for a given security id.
+    /// </summary>
+    /// <param name="securityId">The givens security id.</param>
+    /// <returns>The security descriptor referenced by the given security id.</returns>
+    /// <exception cref="InvalidDataException">
+    ///     [Iff NtfsPolicyConfig:ValidateSdh] Thrown if a mismatch is encountered during
+    ///     internal parsing.
+    /// </exception>
+    private SecurityDescriptor? LookupSecurityDescriptorByIndex(uint securityId)
+    {
+        EnsureIsMounted();
+        Span<byte> lookupKey = stackalloc byte[sizeof(uint)];
+        BinaryPrimitives.WriteUInt32LittleEndian(lookupKey, securityId);
+
+        var index = CreateIndexParser(SecureFile, "$SII");
+        var entry = index.TryFindRootEntry(lookupKey);
+        if (entry == null)
+            return null;
+
+        var offset = entry.GetData().ReadInt64(0x08);
+        var size = entry.GetData().ReadInt32(0x10);
+        const int headerOffset = 20;
+
+        var sdsStream = SecureFile.GetDataStream("$SDS");
+        var sdsEntry = size <= 256 ? stackalloc byte[size] : new byte[size];
+        sdsStream.ReadExactly(offset, sdsEntry);
+
+        // Let's see if the hash matches
+        Trace.Assert(sdsEntry.ReadUInt32() == SecurityHashing.HashSecurityDescriptor(sdsEntry[headerOffset..]));
+
+        var writtenSecurityId = sdsEntry.ReadUInt32(0x04);
+        var writtenOffset = sdsEntry.ReadInt64(0x08);
+        var writtenSize = sdsEntry.ReadInt32(0x10);
+
+        if (NtfsPolicyConfig.PolicyFlags.HasFlag(NtfsPolicyConfig.Flags.ValidateSdh)
+            && (securityId != writtenSecurityId || offset != writtenOffset || size != writtenSize))
+            throw new InvalidDataException(
+                $"Invalid $Secure:$SDS stream - offset/length mismatch of entry with securityId {securityId}" +
+                $"(IndexKeyOffset={offset}, IndexKeySize={size}, SdsEntryOffset={writtenOffset}, SdsEntrySize={writtenSize})!");
+
+        return new SecurityDescriptor(sdsEntry[headerOffset..]);
+    }
+
+    /// <summary>
+    ///     Returns a raw file record representing the file record header & raw attribute data.
+    /// </summary>
+    /// <param name="fixup">Whether to fixup the raw volume data.</param>
+    /// <returns>The raw file record.</returns>
+    private RawFileRecord GetMftRecord(bool fixup = true)
+    {
+        var mftRecord = BootSector.FileRecordSize <= 1024
+            ? stackalloc byte[BootSector.FileRecordSize]
+            : new byte[BootSector.FileRecordSize];
+
+        _provider.ReadExactly(BootSector.MftClusterNumber * BootSector.BytesPerCluster, mftRecord);
+
+        if (fixup)
+            FixupHelper.FixupRecord(mftRecord);
+
+        return new RawFileRecord(mftRecord);
+    }
+
+    /// <summary>
+    ///     Retrieves a specific index parser for a given file/folder of this volume.
+    /// </summary>
+    /// <param name="file">The file to retrieve the index for.</param>
+    /// <param name="index">The type of index to retrieve, e.g. $I30.</param>
+    /// <returns>Returns an index parser for the given file and index.</returns>
+    public IndexParser CreateIndexParser(NtfsFile file, string index)
+    {
+        EnsureIsMounted();
+        return new IndexParser(file, index, CollationHandler, BootSector);
     }
 }

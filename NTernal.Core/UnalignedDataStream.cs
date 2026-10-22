@@ -1,21 +1,14 @@
-using Nternal.Core.Streams;
-
 namespace Nternal.Core;
 
 /// <summary>
-/// Represents a pseudo-stream encapsulating another stream which does not support individual byte-by-byte reads.
+///     Represents a pseudo-stream encapsulating another stream which does not support individual byte-by-byte reads.
 /// </summary>
 public class UnalignedDataStream : IDataStream
 {
-    public long Length => _source.Length;
-    public long AllocatedLength => _source.AllocatedLength;
-    public int Alignment => 1;
-
-    private IDataStream _source { get; }
-    private bool _leaveOpen;
+    private readonly bool _leaveOpen;
 
     /// <summary>
-    /// Creates a new stream supporting reads the underlying stream might not support due to alignment issues.
+    ///     Creates a new stream supporting reads the underlying stream might not support due to alignment issues.
     /// </summary>
     /// <param name="underlying">The stream that should be encapsulated.</param>
     /// <param name="leaveOpen">Whether the underlying stream should be disposed alongside this instance.</param>
@@ -24,6 +17,11 @@ public class UnalignedDataStream : IDataStream
         _source = underlying;
         _leaveOpen = leaveOpen;
     }
+
+    private IDataStream _source { get; }
+    public long Length => _source.Length;
+    public long AllocatedLength => _source.AllocatedLength;
+    public int Alignment => 1;
 
     public void LoadIntoMemory()
     {
@@ -38,17 +36,17 @@ public class UnalignedDataStream : IDataStream
         if (position % _source.Alignment == 0 && buffer.Length % _source.Alignment == 0)
             return _source.Read(position, buffer);
 
-        long startingBlock = position / _source.Alignment;
-        long endingBlock = (position + buffer.Length + _source.Alignment - 1) / _source.Alignment;
+        var startingBlock = position / _source.Alignment;
+        var endingBlock = (position + buffer.Length + _source.Alignment - 1) / _source.Alignment;
 
-        long startOffsetToRead = startingBlock * _source.Alignment;
-        long endOffsetToRead = endingBlock * _source.Alignment;
-        int offsetWithinFirstBlock = (int)(position - startOffsetToRead);
+        var startOffsetToRead = startingBlock * _source.Alignment;
+        var endOffsetToRead = endingBlock * _source.Alignment;
+        var offsetWithinFirstBlock = (int)(position - startOffsetToRead);
 
         Span<byte> alignedRead = new byte[endOffsetToRead - startOffsetToRead];
-        int read = _source.Read(startOffsetToRead, alignedRead);
+        var read = _source.Read(startOffsetToRead, alignedRead);
 
-        int available = Math.Max(0, Math.Min(buffer.Length, read - offsetWithinFirstBlock));
+        var available = Math.Max(0, Math.Min(buffer.Length, read - offsetWithinFirstBlock));
         alignedRead.Slice(offsetWithinFirstBlock, available).CopyTo(buffer);
         return available;
     }

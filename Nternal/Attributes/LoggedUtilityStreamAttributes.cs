@@ -1,23 +1,19 @@
-﻿using Nternal.Core.Streams;
-using Nternal.Extensions;
-using Nternal.Ntfs.Attributes;
-using System;
-using System.Buffers.Binary;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
+﻿using Nternal.Core;
 
-namespace Nternal.Attributes
+namespace Nternal.Ntfs.Attributes;
+
+public class LoggedUtilityStreamAttribute : IParsableAttribute
 {
-    public class LoggedUtilityStreamAttribute : IParsableAttribute
+    public static NtfsAttributeType AttributeType => NtfsAttributeType.LoggedUtilityStream;
+
+    public NtfsAttribute Underlying { get; init; } = null!;
+
+    public void ParseFromAccessor(bool paranoid)
     {
-        public static NtfsAttributeType AttributeType => NtfsAttributeType.LoggedUtilityStream;
+    }
 
-        public NtfsAttribute Underlying { get; init; } = null!;
-
-        public void ParseFromAccessor(bool paranoid)
-        { }
-
-        public IDataStream GetStream() => Underlying.Accessor;
+    public IDataStream GetStream()
+    {
+        return Underlying.Accessor;
     }
 }

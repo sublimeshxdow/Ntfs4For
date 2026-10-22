@@ -48,9 +48,9 @@ public enum SecurityDescriptorControl : ushort
     RmControlValid = 0x4000,
 
     /// <summary>
-    /// Self-relative form (offsets, not pointers). ALWAYS set for anything
-    /// persisted to disk -- the absolute form (raw pointers) cannot be
-    /// stored or transmitted at all.
+    ///     Self-relative form (offsets, not pointers). ALWAYS set for anything
+    ///     persisted to disk -- the absolute form (raw pointers) cannot be
+    ///     stored or transmitted at all.
     /// </summary>
     SelfRelative = 0x8000
 }
